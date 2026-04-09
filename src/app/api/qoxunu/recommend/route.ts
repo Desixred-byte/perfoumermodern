@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import path from "node:path";
+import { readFileSync } from "node:fs";
 
 import { getPerfumes } from "@/lib/catalog";
 import type { Perfume } from "@/types/catalog";
@@ -143,8 +145,57 @@ function parseJsonObject(raw: string) {
   }
 }
 
+function parseEnvFile(filePath: string) {
+  try {
+    const raw = readFileSync(filePath, "utf-8");
+    const result: Record<string, string> = {};
+
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) {
+        continue;
+      }
+
+      const separatorIndex = trimmed.indexOf("=");
+      if (separatorIndex === -1) {
+        continue;
+      }
+
+      const key = trimmed.slice(0, separatorIndex).trim();
+      if (!key) {
+        continue;
+      }
+
+      let value = trimmed.slice(separatorIndex + 1).trim();
+      if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+        value = value.slice(1, -1);
+      }
+
+      result[key] = value;
+    }
+
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+function getEnvValue(key: string) {
+  const direct = process.env[key];
+  if (typeof direct === "string" && direct.trim()) {
+    return direct.trim();
+  }
+
+  const root = process.cwd();
+  const fromEnv = parseEnvFile(path.join(root, ".env"));
+  const fromEnvLocal = parseEnvFile(path.join(root, ".env.local"));
+  const fromFiles = fromEnvLocal[key] || fromEnv[key] || "";
+
+  return fromFiles.trim();
+}
+
 export async function POST(request: Request) {
-  const apiKey = process.env.QOXUNU_OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const apiKey = getEnvValue("QOXUNU_OPENAI_API_KEY") || getEnvValue("OPENAI_API_KEY");
   if (!apiKey) {
     return NextResponse.json({ error: "QOXUNU_OPENAI_API_KEY is missing." }, { status: 503 });
   }
@@ -169,7 +220,7 @@ export async function POST(request: Request) {
       minPrice: getStartingPrice(perfume),
     }));
 
-  const model = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+  const model = getEnvValue("OPENAI_MODEL") || "gpt-4.1-mini";
 
   const completionResponse = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
