@@ -118,31 +118,44 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
       return;
     }
 
+    if (isSubmitting) {
+      return;
+    }
+
     if (!session?.user) {
       router.push(loginHref);
       return;
     }
 
+    const nextState = !isInWishlist;
+    setIsInWishlist(nextState);
+    setButtonFx(nextState ? "save" : "remove");
     setIsSubmitting(true);
 
-    if (isInWishlist) {
-      await supabase
+    if (!nextState) {
+      const { error } = await supabase
         .from("wishlists")
         .delete()
         .eq("user_id", session.user.id)
         .eq("perfume_slug", perfumeSlug);
-      setIsInWishlist(false);
-      setButtonFx("remove");
+
+      if (error) {
+        setIsInWishlist(true);
+      }
+
       setIsSubmitting(false);
       return;
     }
 
-    await supabase.from("wishlists").insert({
+    const { error } = await supabase.from("wishlists").insert({
       user_id: session.user.id,
       perfume_slug: perfumeSlug,
     });
-    setIsInWishlist(true);
-    setButtonFx("save");
+
+    if (error) {
+      setIsInWishlist(false);
+    }
+
     setIsSubmitting(false);
   };
 
@@ -150,17 +163,17 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
     <button
       type="button"
       onClick={toggleWishlist}
-      disabled={isSubmitting}
       className={[
-        "wishlist-pill inline-flex h-12 items-center gap-2 rounded-full border px-5 text-sm font-medium",
+        "wishlist-pill inline-flex h-12 min-w-[11.5rem] items-center justify-center gap-2 rounded-full border px-5 text-sm font-medium",
         isInWishlist
           ? "wishlist-pill--saved border-zinc-900 bg-zinc-900 text-white"
           : "wishlist-pill--idle border-zinc-300 bg-white text-zinc-700",
         buttonFx === "save" ? "wishlist-pill--save-burst" : "",
         buttonFx === "remove" ? "wishlist-pill--remove-swipe" : "",
-        isSubmitting ? "cursor-not-allowed opacity-60" : "",
+        isSubmitting ? "wishlist-pill--busy" : "",
       ].join(" ")}
       aria-label={isInWishlist ? copy[locale].saved : copy[locale].save}
+      aria-busy={isSubmitting}
     >
       <span
         className={[
