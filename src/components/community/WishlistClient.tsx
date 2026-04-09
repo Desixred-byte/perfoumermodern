@@ -43,7 +43,7 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Yüklənir...",
     noItems: "Wishlist boşdur. Məhsul səhifəsindən əlavə edə bilərsən.",
     remove: "Sil",
-    signedInAs: "Daxil olan",
+    signedInAs: "Hesab",
   },
   en: {
     title: "My Wishlist",
@@ -56,7 +56,7 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Loading...",
     noItems: "Your wishlist is empty. Add perfumes from product pages.",
     remove: "Remove",
-    signedInAs: "Signed in as",
+    signedInAs: "Account",
   },
   ru: {
     title: "Мой Wishlist",
@@ -69,7 +69,7 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Загрузка...",
     noItems: "Wishlist пока пуст. Добавляйте ароматы со страницы товара.",
     remove: "Удалить",
-    signedInAs: "Вы вошли как",
+    signedInAs: "Аккаунт",
   },
 };
 
