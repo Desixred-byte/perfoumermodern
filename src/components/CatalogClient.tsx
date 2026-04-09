@@ -614,7 +614,7 @@ export function CatalogClient({
         ? createPortal(
             <div
               className={[
-                "fixed inset-0 z-[90] transition-opacity duration-500",
+                "fixed inset-0 z-[90] overflow-hidden transition-opacity duration-500",
                 isFiltersPanelOpen
                   ? "pointer-events-auto opacity-100"
                   : "pointer-events-none opacity-0",
@@ -632,7 +632,7 @@ export function CatalogClient({
               />
 
               <div
-                className="absolute inset-0 z-10 flex items-end justify-center px-3 pb-3 sm:px-6 sm:pb-6 lg:items-center lg:p-6"
+                className="absolute inset-0 z-10 flex items-end justify-center lg:items-center lg:p-6"
                 onPointerDown={(event) => {
                   if (event.target === event.currentTarget) {
                     setIsFiltersPanelOpen(false);
@@ -646,12 +646,14 @@ export function CatalogClient({
                   aria-label={t.catalog.filters}
                   onPointerDown={(event) => event.stopPropagation()}
                   className={[
-                    "flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,247,0.92)_100%)] backdrop-blur-xl lg:max-h-[calc(100vh-3rem)]",
+                    "flex w-full flex-col overflow-hidden border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,247,0.92)_100%)] backdrop-blur-xl",
+                    "max-h-[calc(100dvh-0.45rem)] rounded-t-[1.7rem] rounded-b-none border-x-0 border-b-0",
+                    "lg:max-h-[calc(100vh-3rem)] lg:max-w-6xl lg:rounded-[2rem] lg:border",
                     "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
                     "shadow-[0_-24px_70px_rgba(15,15,15,0.18)] lg:shadow-[0_26px_70px_rgba(15,15,15,0.2)]",
                     isFiltersPanelOpen
                       ? "translate-y-0 scale-100 opacity-100"
-                      : "translate-y-10 scale-[0.995] opacity-0 lg:translate-y-4 lg:scale-[0.972]",
+                      : "translate-y-16 scale-[0.998] opacity-0 lg:translate-y-4 lg:scale-[0.972]",
                   ].join(" ")}
                 >
             <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-zinc-200/80 lg:hidden" />
@@ -689,7 +691,7 @@ export function CatalogClient({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:px-6">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
                 <SectionShell title={t.catalog.brand} description={t.catalog.allBrands}>
                   <OptionCluster
