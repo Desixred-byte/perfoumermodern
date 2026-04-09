@@ -28,7 +28,6 @@ type Copy = {
   loading: string;
   noItems: string;
   remove: string;
-  signOut: string;
   signedInAs: string;
 };
 
@@ -44,7 +43,6 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Yüklənir...",
     noItems: "Wishlist boşdur. Məhsul səhifəsindən əlavə edə bilərsən.",
     remove: "Sil",
-    signOut: "Çıxış",
     signedInAs: "Daxil olan",
   },
   en: {
@@ -58,7 +56,6 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Loading...",
     noItems: "Your wishlist is empty. Add perfumes from product pages.",
     remove: "Remove",
-    signOut: "Sign out",
     signedInAs: "Signed in as",
   },
   ru: {
@@ -72,7 +69,6 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Загрузка...",
     noItems: "Wishlist пока пуст. Добавляйте ароматы со страницы товара.",
     remove: "Удалить",
-    signOut: "Выйти",
     signedInAs: "Вы вошли как",
   },
 };
@@ -193,21 +189,6 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
     setWishlists((prev) => prev.filter((item) => item.perfume_slug !== perfumeSlug));
   };
 
-  const signOut = async () => {
-    if (!supabase) {
-      return;
-    }
-
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      setMessage(error.message);
-      return;
-    }
-
-    router.push("/login?next=%2Fwishlist");
-    router.refresh();
-  };
-
   if (!isSupabaseConfigured(supabaseConfig ?? undefined)) {
     return <p className="text-sm text-zinc-600">{copy.configMissing}</p>;
   }
@@ -233,18 +214,10 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-[1.4rem] border border-zinc-200 bg-white px-4 py-3">
+      <div className="rounded-[1.4rem] border border-zinc-200 bg-white px-4 py-3">
         <p className="text-sm text-zinc-600">
           {copy.signedInAs}: <span className="font-medium text-zinc-900">{session.user.email}</span>
         </p>
-
-        <button
-          type="button"
-          onClick={signOut}
-          className="text-sm text-zinc-500 underline-offset-2 transition hover:text-zinc-800 hover:underline"
-        >
-          {copy.signOut}
-        </button>
       </div>
 
       {isListLoading ? <p className="text-sm text-zinc-500">{copy.loading}</p> : null}

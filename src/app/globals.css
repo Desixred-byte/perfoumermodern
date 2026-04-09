@@ -488,6 +488,40 @@ h6 {
   -webkit-backdrop-filter: blur(14px);
 }
 
+.account-signout-btn {
+  transform: translateZ(0);
+}
+
+.account-signout-btn::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 999px;
+  background: linear-gradient(115deg, rgba(255, 255, 255, 0) 18%, rgba(255, 255, 255, 0.72) 48%, rgba(255, 255, 255, 0) 78%);
+  opacity: 0;
+  transform: translateX(-115%);
+  transition: transform 520ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease;
+  pointer-events: none;
+}
+
+.account-signout-btn:hover::before {
+  opacity: 0.9;
+  transform: translateX(115%);
+}
+
+.account-signout-btn:active {
+  transform: scale(0.98);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .account-signout-btn,
+  .account-signout-btn::before,
+  .account-signout-icon {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
 .catalog-dropdown-scroll::-webkit-scrollbar {
   width: 8px;
 }

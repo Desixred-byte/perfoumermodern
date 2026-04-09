@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { SignOut } from "@phosphor-icons/react";
 
 import type { Locale } from "@/lib/i18n";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -459,8 +460,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         <button
           type="button"
           onClick={signOut}
-          className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-zinc-50 hover:-translate-y-[1px]"
+          className="account-signout-btn group relative inline-flex min-h-12 items-center justify-center gap-2.5 overflow-hidden rounded-full border border-zinc-800/10 bg-[radial-gradient(circle_at_20%_0%,#faf8f8_0%,#f4f2f2_58%,#ece9e8_100%)] px-7 text-sm font-semibold text-zinc-800 shadow-[0_10px_24px_rgba(20,18,18,0.12)] ring-1 ring-white/80 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:shadow-[0_14px_28px_rgba(20,18,18,0.18)]"
         >
+          <SignOut size={16} className="account-signout-icon text-zinc-700 transition-transform duration-300 group-hover:-rotate-6 group-hover:scale-110" />
           {copy.signOut}
         </button>
       </section>
