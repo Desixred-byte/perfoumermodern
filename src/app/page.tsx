@@ -4,7 +4,256 @@ import { Hero } from "@/components/Hero";
 import { ProductCard } from "@/components/ProductCard";
 import { getFeaturedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
-import { getDictionary } from "@/lib/i18n";
+import { getDictionary, type Locale } from "@/lib/i18n";
+
+type AboutCopy = {
+  eyebrow: string;
+  title: string;
+  description: string;
+  trustEyebrow: string;
+  trustTitle: string;
+  trustDescription: string;
+  trustItems: Array<{
+    title: string;
+    description: string;
+  }>;
+  faqEyebrow: string;
+  faqTitle: string;
+  faqDescription: string;
+  faqItems: Array<{
+    question: string;
+    answer: string;
+  }>;
+  pillars: Array<{
+    label: string;
+    value: string;
+    detail: string;
+  }>;
+  notes: string[];
+};
+
+const ABOUT_COPY: Record<Locale, AboutCopy> = {
+  az: {
+    eyebrow: "Haqqımızda",
+    title: "Gündəlik seçimlər üçün premium ətir komandası",
+    description:
+      "Perfoumer komandası 2020-ci ildən etibarən gündəlik istifadə üçün seçilmiş premium ətirləri təqdim edir və hər sifarişi göndərişdən əvvəl keyfiyyət yoxlamasından keçirir.",
+    trustEyebrow: "Xidmət və Etibar",
+    trustTitle: "Sifarişdən çatdırılmaya qədər şəffaf proses",
+    trustDescription:
+      "Müştəri təcrübəsini sabit saxlamaq üçün sifariş, qablaşdırma və dəstək mərhələləri standart prosedurla idarə olunur.",
+    trustItems: [
+      {
+        title: "Qablaşdırma Standartı",
+        description:
+          "Məhsullar qoruyucu materialla qablaşdırılır, etiket və həcm uyğunluğu göndərişdən öncə yoxlanılır.",
+      },
+      {
+        title: "Çatdırılma İzlənməsi",
+        description:
+          "Sifariş hazırlandıqdan sonra izləmə məlumatı paylaşılır və proses boyunca status yenilənir.",
+      },
+      {
+        title: "Operativ Dəstək",
+        description:
+          "WhatsApp və e-poçt üzərindən seçim, nota uyğunluq və sifariş mərhələsi ilə bağlı sürətli cavab verilir.",
+      },
+    ],
+    faqEyebrow: "FAQ",
+    faqTitle: "Ən çox verilən suallar",
+    faqDescription:
+      "Aşağıdakı cavablar alış prosesində ən çox soruşulan mövzuları qısa və aydın şəkildə izah edir.",
+    faqItems: [
+      {
+        question: "Sifariş neçə günə göndərilir?",
+        answer:
+          "Əksər sifarişlər 1-3 iş günü ərzində hazırlanır və göndərişə verilir.",
+      },
+      {
+        question: "Qoxunun qalıcılığı hər kəsdə eyni olurmu?",
+        answer:
+          "Xeyr. Dəri tipi, hava şəraiti və tətbiq nöqtələri qalıcılığa birbaşa təsir edir.",
+      },
+      {
+        question: "Mənə uyğun qoxunu necə seçə bilərəm?",
+        answer:
+          "Bəyəndiyiniz notları və istifadə məqsədinizi paylaşdıqda komanda uyğun seçimləri təqdim edir.",
+      },
+      {
+        question: "Qaytarılma şərtləri necədir?",
+        answer:
+          "İstifadə olunmamış məhsullar üçün qaytarılma qaydaları mövcuddur; detallı məlumat dəstək vasitəsilə təqdim olunur.",
+      },
+    ],
+    pillars: [
+      {
+        label: "Fəaliyyət",
+        value: "2020-ci ildən",
+        detail: "Müştəri ehtiyacına uyğun niş və dizayner ətirlərdən ibarət davamlı yenilənən kolleksiya.",
+      },
+      {
+        label: "Hazırlama",
+        value: "1-3 iş günü",
+        detail: "Sifarişlər qoruyucu qablaşdırma ilə hazırlanır və izləmə məlumatı ilə göndərilir.",
+      },
+      {
+        label: "Dəstək",
+        value: "Həftə içi 10:00-19:00",
+        detail: "WhatsApp və e-poçt vasitəsilə ölçü, nota və seçim uyğunluğu üzrə operativ dəstək.",
+      },
+    ],
+    notes: [
+      "Qablaşdırma mərhələsində hər məhsulun etiket, həcm və vizual uyğunluğu əlavə olaraq yoxlanılır.",
+      "Kataloq mütəmadi yenilənir: mövsümə uyğun seçmələr və ən çox tələb olunan qoxular önə çıxarılır.",
+    ],
+  },
+  en: {
+    eyebrow: "About Us",
+    title: "A modern fragrance studio managed from Baku",
+    description:
+      "Since 2020, the Perfoumer team has curated premium scents for everyday wear and runs a final quality check before every order is dispatched.",
+    trustEyebrow: "Service & Trust",
+    trustTitle: "A transparent flow from order to delivery",
+    trustDescription:
+      "To keep quality consistent, order handling, packaging, and support are managed through a clear internal process.",
+    trustItems: [
+      {
+        title: "Packaging Standard",
+        description:
+          "Products are packed with protective materials and rechecked for label and volume accuracy before dispatch.",
+      },
+      {
+        title: "Delivery Tracking",
+        description:
+          "Tracking details are shared after preparation so customers can follow the shipment status clearly.",
+      },
+      {
+        title: "Responsive Support",
+        description:
+          "Fast WhatsApp and email support is available for scent matching, notes, and order-stage questions.",
+      },
+    ],
+    faqEyebrow: "FAQ",
+    faqTitle: "Frequently asked questions",
+    faqDescription:
+      "These answers cover the most common topics customers ask before placing an order.",
+    faqItems: [
+      {
+        question: "How long does dispatch take?",
+        answer: "Most orders are prepared and dispatched within 1-3 business days.",
+      },
+      {
+        question: "Is longevity the same for everyone?",
+        answer:
+          "No. Skin type, weather conditions, and application points all affect fragrance longevity.",
+      },
+      {
+        question: "How can I choose the right scent?",
+        answer:
+          "Share your preferred notes and use-case, and the team can suggest suitable options.",
+      },
+      {
+        question: "Do you have a return policy?",
+        answer:
+          "Return options exist for unused items; full details are provided through support channels.",
+      },
+    ],
+    pillars: [
+      {
+        label: "Operating Since",
+        value: "2020",
+        detail: "Continuously curated niche and designer fragrances matched to customer demand.",
+      },
+      {
+        label: "Dispatch Window",
+        value: "1-3 business days",
+        detail: "Orders are prepared with protective packaging and tracking details.",
+      },
+      {
+        label: "Support Hours",
+        value: "Weekdays 10:00-19:00",
+        detail: "Fast WhatsApp and email support for size, notes, and fragrance fit.",
+      },
+    ],
+    notes: [
+      "Each product is rechecked for label, volume, and visual condition during packaging.",
+      "The catalog is updated continuously with seasonal selections and most requested scents.",
+    ],
+  },
+  ru: {
+    eyebrow: "О нас",
+    title: "Современная парфюмерная студия из Баку",
+    description:
+      "С 2020 года команда Perfoumer подбирает премиальные ароматы на каждый день и проводит финальную проверку качества перед отправкой каждого заказа.",
+    trustEyebrow: "Сервис и доверие",
+    trustTitle: "Прозрачный процесс от заказа до доставки",
+    trustDescription:
+      "Чтобы сохранять стабильное качество, этапы заказа, упаковки и поддержки выстроены по единому стандарту.",
+    trustItems: [
+      {
+        title: "Стандарт упаковки",
+        description:
+          "Товары упаковываются с защитой, а перед отправкой дополнительно проверяются этикетка и объем.",
+      },
+      {
+        title: "Отслеживание доставки",
+        description:
+          "После подготовки заказа предоставляется трек-номер, чтобы клиент видел актуальный статус отправления.",
+      },
+      {
+        title: "Быстрая поддержка",
+        description:
+          "По WhatsApp и e-mail можно оперативно получить помощь по выбору аромата и этапу заказа.",
+      },
+    ],
+    faqEyebrow: "FAQ",
+    faqTitle: "Часто задаваемые вопросы",
+    faqDescription:
+      "Ниже собраны короткие ответы на самые частые вопросы перед покупкой.",
+    faqItems: [
+      {
+        question: "За сколько дней отправляется заказ?",
+        answer: "Большинство заказов подготавливается и отправляется в течение 1-3 рабочих дней.",
+      },
+      {
+        question: "Стойкость аромата у всех одинаковая?",
+        answer:
+          "Нет. На стойкость влияют тип кожи, погода и точки нанесения.",
+      },
+      {
+        question: "Как выбрать подходящий аромат?",
+        answer:
+          "Сообщите предпочтительные ноты и цель использования, и команда предложит подходящие варианты.",
+      },
+      {
+        question: "Есть ли возврат?",
+        answer:
+          "Для неиспользованных товаров предусмотрены условия возврата; подробности можно получить через поддержку.",
+      },
+    ],
+    pillars: [
+      {
+        label: "Работаем с",
+        value: "2020 года",
+        detail: "Постоянно обновляемая коллекция нишевых и дизайнерских ароматов по запросам клиентов.",
+      },
+      {
+        label: "Отправка",
+        value: "1-3 рабочих дня",
+        detail: "Заказы подготавливаются с защитной упаковкой и данными для отслеживания.",
+      },
+      {
+        label: "Поддержка",
+        value: "Будни 10:00-19:00",
+        detail: "Быстрые консультации в WhatsApp и по e-mail по объему, нотам и выбору аромата.",
+      },
+    ],
+    notes: [
+      "На этапе упаковки дополнительно проверяются этикетка, объем и внешний вид каждого товара.",
+      "Каталог регулярно обновляется с учетом сезона и самых востребованных ароматов.",
+    ],
+  },
+};
 
 export default async function Home() {
   const locale = await getCurrentLocale();
@@ -16,6 +265,7 @@ export default async function Home() {
     { value: "15k+", ...t.home.stats[2] },
     { value: "4.9/5", ...t.home.stats[3] },
   ];
+  const about = ABOUT_COPY[locale];
 
   return (
     <div className="bg-[#f3f3f2]">
@@ -75,6 +325,123 @@ export default async function Home() {
                 </p>
               </article>
             ))}
+          </div>
+
+          <div className="mt-8 overflow-hidden rounded-[2rem] border border-zinc-200/75 bg-[linear-gradient(132deg,rgba(255,255,255,0.9)_0%,rgba(249,248,245,0.92)_46%,rgba(240,236,230,0.82)_100%)] p-6 shadow-[0_18px_44px_rgba(20,20,22,0.06)] sm:p-8 md:mt-10 md:p-10">
+            <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
+              <div>
+                <p className="text-[0.72rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase">
+                  {about.eyebrow}
+                </p>
+                <h3 className="mt-3 max-w-[18ch] text-4xl leading-[1.02] text-zinc-900 md:text-5xl">
+                  {about.title}
+                </h3>
+                <p className="mt-4 max-w-2xl text-[1.01rem] leading-relaxed text-zinc-600">
+                  {about.description}
+                </p>
+
+                <div className="mt-6 space-y-3">
+                  {about.notes.map((note) => (
+                    <p
+                      key={note}
+                      className="rounded-2xl border border-[#d8c9b4]/40 bg-white/72 px-4 py-3 text-sm leading-relaxed text-zinc-700 shadow-[0_8px_24px_rgba(22,22,24,0.04)]"
+                    >
+                      {note}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-1">
+                {about.pillars.map((pillar, index) => (
+                  <article
+                    key={pillar.label}
+                    className={[
+                      "rounded-2xl border px-5 py-5 shadow-[0_10px_28px_rgba(18,18,20,0.05)]",
+                      index === 0
+                        ? "border-[#d7c3a3]/55 bg-[#fff8ef]/84"
+                        : index === 1
+                          ? "border-[#cec9bb]/60 bg-white/84"
+                          : "border-[#c9d1d9]/60 bg-[#f7fafc]/84",
+                    ].join(" ")}
+                  >
+                    <p className="text-[0.7rem] font-medium tracking-[0.2em] text-zinc-400 uppercase">
+                      {pillar.label}
+                    </p>
+                    <p className="stat-value mt-2 text-[2rem] leading-none tracking-[-0.02em] text-zinc-900">
+                      {pillar.value}
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-zinc-600">
+                      {pillar.detail}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 overflow-hidden rounded-[2rem] border border-zinc-300/55 bg-[linear-gradient(132deg,rgba(29,31,36,0.98)_0%,rgba(39,42,49,0.96)_46%,rgba(30,33,39,0.98)_100%)] p-6 shadow-[0_20px_46px_rgba(8,8,10,0.28)] sm:p-8 md:p-10">
+            <div className="max-w-3xl">
+              <p className="text-[0.72rem] font-semibold tracking-[0.22em] text-zinc-300 uppercase">
+                {about.trustEyebrow}
+              </p>
+              <h3 className="mt-3 text-4xl leading-[1.02] text-white md:text-5xl">
+                {about.trustTitle}
+              </h3>
+              <p className="mt-4 max-w-2xl text-[1.01rem] leading-relaxed text-zinc-300">
+                {about.trustDescription}
+              </p>
+            </div>
+
+            <div className="mt-7 grid gap-3 md:grid-cols-3">
+              {about.trustItems.map((item, index) => (
+                <article
+                  key={item.title}
+                  className="rounded-2xl border border-white/12 bg-white/5 px-5 py-5 shadow-[0_12px_26px_rgba(5,5,6,0.22)] backdrop-blur-sm"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-white/24 bg-white/10 text-xs font-semibold text-zinc-100">
+                      {index + 1}
+                    </span>
+                    <p className="text-[1.02rem] font-semibold text-zinc-100">{item.title}</p>
+                  </div>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-300">{item.description}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-[2rem] border border-zinc-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.78)_0%,rgba(246,248,252,0.86)_100%)] p-6 shadow-[0_16px_38px_rgba(20,20,22,0.05)] sm:p-8 md:p-10">
+            <div className="max-w-3xl">
+              <p className="text-[0.72rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase">
+                {about.faqEyebrow}
+              </p>
+              <h3 className="mt-3 text-4xl leading-[1.02] text-zinc-900 md:text-5xl">
+                {about.faqTitle}
+              </h3>
+              <p className="mt-4 max-w-2xl text-[1.01rem] leading-relaxed text-zinc-600">
+                {about.faqDescription}
+              </p>
+            </div>
+
+            <div className="mt-7 space-y-3">
+              {about.faqItems.map((item, index) => (
+                <article
+                  key={item.question}
+                  className="rounded-2xl border border-zinc-200/70 bg-white/90 px-5 py-4 shadow-[0_8px_20px_rgba(20,20,22,0.04)]"
+                >
+                  <div className="flex items-start gap-3">
+                    <span className="mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-zinc-900 px-1.5 text-[0.68rem] font-semibold tracking-[0.06em] text-white">
+                      Q{index + 1}
+                    </span>
+                    <div>
+                      <h4 className="text-[1rem] font-semibold text-zinc-800">{item.question}</h4>
+                      <p className="mt-2 text-sm leading-relaxed text-zinc-600">{item.answer}</p>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
       </main>

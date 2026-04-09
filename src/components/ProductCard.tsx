@@ -60,11 +60,11 @@ export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
           />
         </div>
       </div>
-      <div className="px-1 pt-3 transition-transform duration-300 group-hover:-translate-y-0.5 sm:pt-4">
-        <h3 className="line-clamp-2 text-base leading-tight font-medium text-zinc-900 transition-colors duration-300 group-hover:text-zinc-800 sm:text-xl">
+      <div className="px-1 pt-3 transition-transform duration-300 md:group-hover:-translate-y-0.5 sm:pt-4">
+        <h3 className="line-clamp-2 text-base leading-tight font-medium text-zinc-900 transition-colors duration-300 md:group-hover:text-zinc-800 sm:text-xl">
           {perfume.name}
         </h3>
-        <p className="mt-1 text-xs text-zinc-500 transition-colors duration-300 group-hover:text-zinc-500 sm:text-sm">
+        <p className="mt-1 text-xs text-zinc-500 transition-colors duration-300 md:group-hover:text-zinc-500 sm:text-sm">
           {startingPrice
             ? `${startingPrice} ₼ / ${t.productCard.starting}`
             : t.productCard.quote}

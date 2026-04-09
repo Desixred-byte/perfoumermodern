@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "@phosphor-icons/react";
 
@@ -41,8 +41,11 @@ function getStoredContext(): StoredContext | null {
 export function DetailBackButton({ locale }: DetailBackButtonProps) {
   const router = useRouter();
   const t = getDictionary(locale);
+  const [source, setSource] = useState<StoredContext | null>(null);
 
-  const source = useMemo(() => getStoredContext(), []);
+  useEffect(() => {
+    setSource(getStoredContext());
+  }, []);
 
   const label = useMemo(() => {
     if (!source?.sourceUrl) {

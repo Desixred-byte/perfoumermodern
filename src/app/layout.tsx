@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Playfair_Display, Poppins } from "next/font/google";
 
 import { AppShell } from "@/components/AppShell";
+import { ConsoleCredit } from "@/components/ConsoleCredit";
 import { getCurrentLocale } from "@/lib/i18n.server";
 
 import "./globals.css";
@@ -68,6 +69,7 @@ export default async function RootLayout({
       className={`${poppins.variable} ${playfair.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <ConsoleCredit />
         <AppShell locale={locale}>{children}</AppShell>
       </body>
     </html>

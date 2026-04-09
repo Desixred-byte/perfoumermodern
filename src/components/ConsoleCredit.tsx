@@ -1,0 +1,126 @@
+"use client";
+
+import { useEffect } from "react";
+
+type CreditLine = {
+  lang: string;
+  text: string;
+};
+
+const CREDIT_LINES: CreditLine[] = [
+  {
+    lang: "AZ",
+    text: "Bu vebsayt Bakhishov Brands tərəfindən hazırlanıb. Oğurluq qadağandır.",
+  },
+  {
+    lang: "EN",
+    text: "This website is made by Bakhishov Brands. Stealing is prohibited.",
+  },
+  {
+    lang: "TR",
+    text: "Bu web sitesi Bakhishov Brands tarafından hazırlandı. Çalmak yasaktır.",
+  },
+  {
+    lang: "RU",
+    text: "Этот сайт создан Bakhishov Brands. Копирование запрещено.",
+  },
+  {
+    lang: "ES",
+    text: "Este sitio fue creado por Bakhishov Brands. Robar esta prohibido.",
+  },
+  {
+    lang: "FR",
+    text: "Ce site est cree par Bakhishov Brands. Le vol est interdit.",
+  },
+  {
+    lang: "DE",
+    text: "Diese Website wurde von Bakhishov Brands erstellt. Diebstahl ist verboten.",
+  },
+  {
+    lang: "AR",
+    text: "تم إنشاء هذا الموقع بواسطة Bakhishov Brands. السرقة ممنوعة.",
+  },
+  {
+    lang: "IT",
+    text: "Questo sito e stato creato da Bakhishov Brands. Rubare e vietato.",
+  },
+  {
+    lang: "PT",
+    text: "Este site foi feito por Bakhishov Brands. Roubo e proibido.",
+  },
+];
+
+export function ConsoleCredit() {
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const imageBlockStyle = [
+      "display:block",
+      "padding:88px 240px",
+      "line-height:1",
+      "border-radius:20px",
+      "background-image:url('/BAKHISHOV.png')",
+      "background-size:cover",
+      "background-position:center",
+      "box-shadow:0 20px 50px rgba(0,0,0,0.35)",
+      "margin:24px 0 10px 0",
+    ].join(";");
+
+    const titleStyle = [
+      "font:900 22px/1.1 'Poppins',sans-serif",
+      "letter-spacing:.2em",
+      "color:#f6f6f7",
+      "text-shadow:0 8px 24px rgba(0,0,0,0.35)",
+    ].join(";");
+
+    const subtitleStyle = [
+      "font:700 11px/1.4 'Poppins',sans-serif",
+      "letter-spacing:.24em",
+      "text-transform:uppercase",
+      "color:#bfbfc5",
+      "margin-bottom:8px",
+    ].join(";");
+
+    console.log("%c ", imageBlockStyle);
+    console.log("%cBAKHISHOV BRANDS", titleStyle);
+    console.log("%cORIGINAL WORK ONLY", subtitleStyle);
+
+    let index = 0;
+    const intervalId = window.setInterval(() => {
+      const item = CREDIT_LINES[index % CREDIT_LINES.length];
+      const hue = (index * 37) % 360;
+
+      const lineStyle = [
+        "font:700 14px/1.45 'Poppins',sans-serif",
+        "letter-spacing:.04em",
+        "color:white",
+        `text-shadow:0 0 18px hsla(${hue}, 88%, 74%, .55)`,
+      ].join(";");
+
+      console.log(`%c${item.lang}: ${item.text}`, lineStyle);
+
+      index += 1;
+      if (index >= CREDIT_LINES.length * 2) {
+        window.clearInterval(intervalId);
+
+        const lockStyle = [
+          "font:800 13px/1.4 'Poppins',sans-serif",
+          "letter-spacing:.16em",
+          "text-transform:uppercase",
+          "color:#ffd7b5",
+          "margin-top:4px",
+        ].join(";");
+
+        console.log("%cProtected by Bakhishov Brands", lockStyle);
+      }
+    }, 900);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  return null;
+}

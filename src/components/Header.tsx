@@ -20,6 +20,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
     { href: "/", label: t.header.home },
     { href: "/#about", label: t.header.about },
     { href: "/catalog", label: t.header.products },
+    { href: "/qoxunu", label: t.header.scentQuiz },
     { href: "/brands", label: t.header.brands },
     { href: "/#contact", label: t.header.contact },
   ];
@@ -156,94 +157,22 @@ export function Header({ floating = false, locale }: HeaderProps) {
 
       <div
         className={[
-          "fixed inset-0 z-40 bg-[#f3f3f2]/98 backdrop-blur-sm",
+          "fixed inset-0 z-40 origin-top transform-gpu bg-[#f3f3f2]/98 shadow-[0_20px_52px_rgba(16,16,18,0.2)] backdrop-blur-sm",
           menuTransition,
-          isMenuOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
+          isMenuOpen
+            ? "pointer-events-auto translate-y-0"
+            : "pointer-events-none -translate-y-[104%]",
         ].join(" ")}
         aria-hidden={!isMenuOpen}
       >
         <div
         className={[
-          "mx-auto h-full max-w-[1540px] px-6 md:px-10",
+          "mx-auto h-full max-w-[1540px] px-6 pt-20 md:px-10 md:pt-28",
           menuTransition,
-          isMenuOpen ? "translate-y-0" : "translate-y-3",
+          isMenuOpen ? "translate-y-0" : "-translate-y-2",
         ].join(" ")}
         >
-          <div className="sticky top-0 z-10 mt-1 flex items-center justify-between py-4 sm:py-6">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              <span
-                className="header-logo-orb grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9"
-                onMouseMove={handleLogoMouseMove}
-                onMouseLeave={handleLogoMouseLeave}
-              >
-                <Image
-                  src="/logo.webp"
-                  alt="Perfoumer"
-                  width={28}
-                  height={28}
-                  className="header-logo-image h-6 w-6 object-contain sm:h-8 sm:w-8"
-                />
-              </span>
-              <span className="flex flex-col leading-none">
-                <span className="brand-wordmark text-[1.45rem] tracking-tight sm:text-3xl">
-                  Perfoumer
-                </span>
-                <span className="mt-0.5 text-[0.58rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase sm:text-[0.62rem]">
-                  {t.header.tagline}
-                </span>
-              </span>
-            </Link>
-
-            <div className="hidden items-center gap-2 sm:gap-3 md:flex">
-              <div className="flex items-center rounded-full bg-white/92 p-1 shadow-sm ring-1 ring-zinc-200/80">
-                {locales.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => updateLocale(item)}
-                    className={[
-                      "rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-300",
-                      locale === item
-                        ? "bg-zinc-900 text-white"
-                        : "text-zinc-500 hover:text-zinc-800",
-                    ].join(" ")}
-                  >
-                    {t.languages[item]}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                aria-label={t.header.closeMenu}
-                onClick={() => setIsMenuOpen(false)}
-                className="group relative grid h-10 w-10 place-items-center rounded-full bg-white text-zinc-700 opacity-100 shadow-sm ring-1 ring-zinc-200/80 transition-[background-color,box-shadow] duration-300 hover:bg-white hover:shadow-md sm:h-11 sm:w-11"
-              >
-                <span
-                  className={[
-                    `${stickTransition} bg-zinc-600`,
-                    isMenuOpen
-                      ? "translate-y-0 rotate-45"
-                      : "-translate-y-1 rotate-0 group-hover:-translate-y-[5px] group-hover:w-5",
-                  ].join(" ")}
-                />
-                <span
-                  className={[
-                    `${stickTransition} bg-zinc-600`,
-                    isMenuOpen
-                      ? "translate-y-0 -rotate-45"
-                      : "translate-y-1 rotate-0 group-hover:translate-y-[5px] group-hover:w-5",
-                  ].join(" ")}
-                />
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-4 flex items-center gap-3 md:hidden">
+          <div className="mt-2 flex items-center gap-3 md:hidden">
             <p className="text-[0.68rem] font-medium tracking-[0.24em] text-zinc-400 uppercase">
               {locale.toUpperCase()}
             </p>
@@ -266,7 +195,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
             </div>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-6 md:mt-8">
             <nav className="flex w-full flex-col">
               {menuItems.map((item, index) => (
                 <Link
