@@ -563,8 +563,9 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   ];
 
   const resultTags = getResultTags(dictionary, answers);
-  const featuredMatch = shownMatches[0];
-  const secondaryMatches = shownMatches.slice(1);
+  const visibleMatches = isMobileLayout ? (aiMatches ?? []) : shownMatches;
+  const featuredMatch = visibleMatches[0];
+  const secondaryMatches = visibleMatches.slice(1);
 
   const summaryPreview = useMemo(() => {
     if (!aiSummary) return "";
@@ -866,9 +867,12 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               <div>
                 <h2 className="text-[1.7rem] leading-tight text-zinc-900 sm:text-[1.95rem] lg:text-[2.15rem]">{dictionary.resultTitle}</h2>
                 <p className="mt-1.5 max-w-3xl text-[0.88rem] leading-6 text-zinc-600 sm:text-[0.93rem]">{dictionary.resultDescription}</p>
+                <p className="mt-2 inline-flex rounded-full border border-zinc-700/20 bg-white/80 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase md:hidden">
+                  {dictionary.resultConfidenceLabel}: {resultConfidence}%
+                </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+              <div className="hidden flex-wrap items-center gap-2 lg:justify-end md:flex">
                 <p className="inline-flex rounded-full border border-zinc-700/20 bg-white/75 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
                   {dictionary.resultConfidenceLabel}: {resultConfidence}%
                 </p>
@@ -891,7 +895,19 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
           {isMobileLayout ? (
             <div className="mt-3 space-y-3">
-              {featuredMatch ? (
+              {isAiLoading ? (
+                <div className="rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-4">
+                  <p className="text-sm font-medium text-zinc-700">{dictionary.generating}</p>
+                  <p className="mt-1 text-xs text-zinc-500">{dictionary.generatingHint}</p>
+                  <div className="mt-3 space-y-2">
+                    <div className="quiz-loading-chip h-40 rounded-[1.1rem]" />
+                    <div className="quiz-loading-chip h-4 rounded-lg" />
+                    <div className="quiz-loading-chip h-3 w-2/3 rounded-lg" />
+                  </div>
+                </div>
+              ) : null}
+
+              {!isAiLoading && featuredMatch ? (
                 <section className="qoxunu-mobile-featured rounded-[1.35rem] border border-zinc-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="inline-flex rounded-full border border-zinc-300/90 bg-[#f7f6f3] px-2.5 py-1 text-[0.62rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
@@ -910,7 +926,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                 </section>
               ) : null}
 
-              {secondaryMatches.length ? (
+              {!isAiLoading && secondaryMatches.length ? (
                 <section>
                   <p className="mb-2 text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.otherPicksLabel}</p>
                   <div className="qoxunu-mobile-carousel -mx-2 flex gap-3 overflow-x-auto px-2 pb-2 pr-5 snap-x snap-mandatory">
@@ -926,34 +942,61 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                 </section>
               ) : null}
 
-              <section className="qoxunu-mobile-summary rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</p>
-                    <p className={isSummaryExpanded ? "mt-1 text-sm leading-6 text-zinc-700" : "qoxunu-summary-preview mt-1 text-sm leading-6 text-zinc-700"}>
-                      {isSummaryExpanded ? aiSummary : summaryPreview}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsSummaryExpanded((value) => !value)}
-                    className="shrink-0 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 py-2 text-[0.65rem] font-semibold text-zinc-700"
-                  >
-                    {isSummaryExpanded ? dictionary.showLess : dictionary.showMore}
-                  </button>
+              {!isAiLoading && !featuredMatch ? (
+                <div className="quiz-results-empty rounded-[1.2rem] border border-zinc-200 bg-white px-3 py-3 text-zinc-500">
+                  <p className="text-lg font-semibold text-zinc-700">{dictionary.noMatchTitle}</p>
+                  <p className="mt-1.5 text-sm leading-6">{dictionary.noMatchDescription}</p>
                 </div>
+              ) : null}
 
+              <div className="qoxunu-mobile-dock">
                 {isSummaryExpanded ? (
-                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-                    {summaryChips.map((chip) => (
-                      <div key={chip.label} className="qoxunu-summary-chip min-w-[72%] shrink-0 rounded-xl border border-zinc-200/80 bg-[#fafaf8] px-3 py-2">
-                        <p className="text-[0.62rem] font-semibold tracking-[0.12em] text-zinc-500 uppercase">{chip.label}</p>
-                        <p className="mt-1 text-[0.8rem] leading-5 text-zinc-700">{chip.value}</p>
+                  <div className="qoxunu-mobile-dock-panel rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</p>
+                        <p className="qoxunu-summary-preview mt-1 text-sm leading-6 text-zinc-700">{summaryPreview || aiSummary}</p>
                       </div>
-                    ))}
+                      <button
+                        type="button"
+                        onClick={() => setIsSummaryExpanded(false)}
+                        className="shrink-0 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 py-2 text-[0.65rem] font-semibold text-zinc-700"
+                      >
+                        {dictionary.showLess}
+                      </button>
+                    </div>
+
+                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                      {summaryChips.map((chip) => (
+                        <div key={chip.label} className="qoxunu-summary-chip min-w-[72%] shrink-0 rounded-xl border border-zinc-200/80 bg-[#fafaf8] px-3 py-2">
+                          <p className="text-[0.62rem] font-semibold tracking-[0.12em] text-zinc-500 uppercase">{chip.label}</p>
+                          <p className="mt-1 text-[0.8rem] leading-5 text-zinc-700">{chip.value}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : null}
-              </section>
+
+                <div className="qoxunu-mobile-dock-bar rounded-[1.15rem] border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-[0_12px_28px_rgba(24,24,24,0.08)] backdrop-blur-md">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsSummaryExpanded((value) => !value)}
+                      className="min-h-11 flex-1 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 text-left text-[0.78rem] font-medium text-zinc-700"
+                    >
+                      <span className="block text-[0.62rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</span>
+                      <span className="mt-1 block truncate text-[0.8rem] leading-5 text-zinc-700">{summaryPreview || aiSummary}</span>
+                    </button>
+
+                    <Link
+                      href="/catalog"
+                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-4 text-sm font-semibold text-[#fffdf8] shadow-[0_12px_24px_rgba(90,70,35,0.2)]"
+                    >
+                      {dictionary.seeCatalog}
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <>

@@ -235,12 +235,6 @@ h6 {
     border-color 280ms ease;
 }
 
-.product-card:hover {
-  transform: translateY(-6px);
-  box-shadow: 0 18px 34px rgba(24, 24, 24, 0.1);
-  border-color: rgba(161, 161, 170, 0.38);
-}
-
 .product-media {
   background: radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.55) 0%, rgba(246, 246, 244, 0.74) 52%, rgba(242, 242, 240, 0.9) 100%);
   transition:
@@ -258,17 +252,37 @@ h6 {
     filter 360ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.product-card:hover .product-media {
-  transform: translateY(-1px);
+@media (hover: hover) and (pointer: fine) {
+  .product-card:hover {
+    transform: translateY(-6px);
+    box-shadow: 0 18px 34px rgba(24, 24, 24, 0.1);
+    border-color: rgba(161, 161, 170, 0.38);
+  }
+
+  .product-card:hover .product-media {
+    transform: translateY(-1px);
+  }
+
+  .product-card:hover .product-image {
+    transform: scale(1.03);
+    filter:
+      saturate(1.03)
+      contrast(1.01)
+      drop-shadow(0 16px 20px rgba(0, 0, 0, 0.18))
+      drop-shadow(0 28px 34px rgba(0, 0, 0, 0.1));
+  }
 }
 
-.product-card:hover .product-image {
-  transform: scale(1.03);
-  filter:
-    saturate(1.03)
-    contrast(1.01)
-    drop-shadow(0 16px 20px rgba(0, 0, 0, 0.18))
-    drop-shadow(0 28px 34px rgba(0, 0, 0, 0.1));
+@media (hover: none) and (pointer: coarse) {
+  .product-card,
+  .product-media,
+  .product-image {
+    transition: none;
+  }
+
+  .product-card {
+    transform: none;
+  }
 }
 
 @keyframes catalogCardIn {
@@ -985,11 +999,11 @@ h6 {
 .quiz-results-hero {
   border: 1px solid rgba(179, 163, 130, 0.35);
   background:
-    linear-gradient(140deg, rgba(255, 255, 255, 0.48) 0%, rgba(249, 243, 230, 0.52) 44%, rgba(246, 236, 212, 0.58) 100%),
-    radial-gradient(circle at 84% 28%, rgba(197, 157, 92, 0.18) 0%, rgba(197, 157, 92, 0) 48%);
+    linear-gradient(140deg, rgba(255, 255, 255, 0.72) 0%, rgba(250, 248, 244, 0.48) 46%, rgba(245, 243, 238, 0.42) 100%),
+    radial-gradient(circle at 84% 28%, rgba(197, 157, 92, 0.08) 0%, rgba(197, 157, 92, 0) 52%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.68),
-    0 22px 44px rgba(88, 70, 39, 0.13);
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    0 20px 40px rgba(88, 70, 39, 0.08);
 }
 
 .qoxunu-result-header {
@@ -1022,8 +1036,8 @@ h6 {
 
 .qoxunu-mobile-featured {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    0 16px 30px rgba(24, 24, 24, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.84),
+    0 12px 24px rgba(24, 24, 24, 0.05);
 }
 
 .qoxunu-mobile-carousel {
@@ -1044,16 +1058,39 @@ h6 {
 
 .qoxunu-mobile-summary {
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.82),
-    0 12px 24px rgba(24, 24, 24, 0.05);
+    inset 0 1px 0 rgba(255, 255, 255, 0.88),
+    0 10px 20px rgba(24, 24, 24, 0.04);
 }
 
-.qoxunu-sticky-cta {
+.qoxunu-mobile-dock {
   position: fixed;
   left: 0.75rem;
   right: 0.75rem;
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   z-index: 40;
+}
+
+.qoxunu-mobile-dock {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.qoxunu-mobile-dock-panel {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    0 14px 28px rgba(24, 24, 24, 0.06);
+}
+
+.qoxunu-mobile-dock-bar {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 14px 28px rgba(24, 24, 24, 0.08);
+}
+
+.qoxunu-mobile-dock-bar,
+.qoxunu-mobile-dock-panel {
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .qoxunu-sticky-cta-button {
@@ -1086,7 +1123,7 @@ h6 {
   height: 150%;
   right: -8%;
   top: -44%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.35) 0%, rgba(255, 255, 255, 0) 64%);
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 64%);
   animation: quizResultSparkle 8.2s ease-in-out infinite;
 }
 
@@ -1095,7 +1132,7 @@ h6 {
   height: 110%;
   left: -9%;
   bottom: -56%;
-  background: radial-gradient(circle, rgba(216, 183, 122, 0.22) 0%, rgba(216, 183, 122, 0) 68%);
+  background: radial-gradient(circle, rgba(216, 183, 122, 0.12) 0%, rgba(216, 183, 122, 0) 68%);
   animation: quizResultSparkle 10.6s ease-in-out infinite reverse;
 }
 
