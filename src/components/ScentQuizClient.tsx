@@ -1,7 +1,7 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ProductCard } from "@/components/ProductCard";
 import type { Locale } from "@/lib/i18n";
@@ -14,6 +14,13 @@ type QuizAnswers = {
   intensity: string;
   profile: string;
   budget: string;
+  season: string;
+  longevity: string;
+};
+
+type TextAnswers = {
+  favoriteNotes: string;
+  avoidNotes: string;
 };
 
 type Option = {
@@ -22,12 +29,24 @@ type Option = {
   hint: string;
 };
 
-type Question = {
+type ChoiceQuestion = {
+  kind: "choice";
   key: keyof QuizAnswers;
   title: string;
   description: string;
   options: Option[];
 };
+
+type OptionalTextQuestion = {
+  kind: "text";
+  key: keyof TextAnswers;
+  title: string;
+  description: string;
+  label: string;
+  placeholder: string;
+};
+
+type Question = ChoiceQuestion | OptionalTextQuestion;
 
 type QuizDictionary = {
   eyebrow: string;
@@ -41,83 +60,41 @@ type QuizDictionary = {
   seeCatalog: string;
   resultTitle: string;
   resultDescription: string;
+  generating: string;
   noMatchTitle: string;
   noMatchDescription: string;
-  questions: Question[];
-};
-
-type AiCopy = {
-  title: string;
-  description: string;
-  promptLabel: string;
-  promptPlaceholder: string;
-  promptHint: string;
-  run: string;
-  running: string;
-  followUps: string;
-  apiMissing: string;
+  aiQuestionsLabel: string;
+  fallbackNotice: string;
+  sameResultNotice: string;
   failed: string;
-};
-
-const AI_COPY: Record<Locale, AiCopy> = {
-  az: {
-    title: "AI ilə daha dəqiq seçim",
-    description: "İstəyini sərbəst yaz, AI nəticəni şəxsiləşdirsin.",
-    promptLabel: "Əlavə istəyin",
-    promptPlaceholder: "Məsələn: Yay üçün təravətli, ağır olmayan, ofisə uyğun və qadınların çox bəyəndiyi bir qoxu istəyirəm.",
-    promptHint: "Qeyd: xarakter, mövsüm, sevdiyin notlar və istifadə mühitini yazmaq nəticəni yaxşılaşdırır.",
-    run: "AI tövsiyə et",
-    running: "AI düşünür...",
-    followUps: "AI-nin əlavə sualları",
-    apiMissing: "AI konfiqurasiyası tapılmadı. QOXUNU_OPENAI_API_KEY əlavə edin.",
-    failed: "AI tövsiyəsi alınmadı. Yenidən cəhd edin.",
-  },
-  en: {
-    title: "AI refined recommendation",
-    description: "Add a free-text note and let AI personalize your picks.",
-    promptLabel: "Extra preference",
-    promptPlaceholder: "Example: I want a fresh summer scent, not heavy, office-safe, and attractive in close encounters.",
-    promptHint: "Tip: include mood, season, favorite notes, and context for stronger results.",
-    run: "Get AI picks",
-    running: "AI is thinking...",
-    followUps: "AI follow-up questions",
-    apiMissing: "AI is not configured. Add QOXUNU_OPENAI_API_KEY.",
-    failed: "Could not get AI recommendations. Please try again.",
-  },
-  ru: {
-    title: "Точный подбор с AI",
-    description: "Опишите пожелания свободным текстом, и AI персонализирует выбор.",
-    promptLabel: "Дополнительный запрос",
-    promptPlaceholder: "Например: Нужен свежий летний аромат, не слишком тяжелый, подходящий для офиса и приятный на близкой дистанции.",
-    promptHint: "Совет: добавьте настроение, сезон, любимые ноты и контекст использования.",
-    run: "Получить AI-подбор",
-    running: "AI анализирует...",
-    followUps: "Дополнительные вопросы от AI",
-    apiMissing: "AI не настроен. Добавьте QOXUNU_OPENAI_API_KEY.",
-    failed: "Не удалось получить рекомендации AI. Попробуйте снова.",
-  },
+  apiMissing: string;
+  questions: Question[];
 };
 
 const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
   az: {
     eyebrow: "Qoxunu Tap",
-    title: "Sənin üçün uyğun ətiri 6 qısa sualla tapaq",
-    description:
-      "Aşağıdakı sualları bir-bir cavabla. Sistem cavablarına əsasən ən uyğun 3 qoxunu təqdim edəcək.",
+    title: "Sənin üçün uyğun ətiri ağıllı suallarla tapaq",
+    description: "Seçim + qısa mətn sualları ilə AI daha dəqiq nəticə çıxaracaq.",
     stepsLabel: "Addım",
     progressLabel: "İrəliləyiş",
     next: "Növbəti",
     previous: "Geri",
     restart: "Yenidən başla",
     seeCatalog: "Kataloqa bax",
-    resultTitle: "Sənin üçün seçilən top 3 qoxu",
-    resultDescription:
-      "Bu nəticə cavablarına görə hesablanır. İstəsən testi yenidən keçib fərqli seçimlərlə müqayisə edə bilərsən.",
+    resultTitle: "AI ilə seçilən top 3 qoxu",
+    resultDescription: "Nəticə həm cavablara, həm də yazdığın əlavə qeydlərə əsasən yaradılıb.",
+    generating: "AI nəticəni hazırlayır...",
     noMatchTitle: "Uyğun nəticə tapılmadı",
-    noMatchDescription:
-      "Filtrlər çox dar ola bilər. Testi yenidən başlayıb daha geniş seçimlər et.",
+    noMatchDescription: "Filtrlər çox dar ola bilər. Testi yenidən başlayıb daha geniş seçimlər et.",
+    aiQuestionsLabel: "AI-nin əlavə sualları",
+    fallbackNotice: "AI hazırda əlçatan deyil, standart ağıllı nəticə göstərilir.",
+    sameResultNotice: "AI nəticəsi mövcud seçimlərlə eyni qaldı.",
+    failed: "AI tövsiyəsi alınmadı. Yenidən cəhd edin.",
+    apiMissing: "AI konfiqurasiyası tapılmadı. QOXUNU_OPENAI_API_KEY əlavə edin.",
     questions: [
       {
+        kind: "choice",
         key: "gender",
         title: "Əsasən hansı kateqoriya axtarırsan?",
         description: "Bu seçim uyğun qoxuları daha dəqiq qruplaşdırmağa kömək edir.",
@@ -129,6 +106,7 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
         ],
       },
       {
+        kind: "choice",
         key: "vibe",
         title: "Qoxunun ümumi ab-havası necə olsun?",
         description: "Ən çox hiss etmək istədiyin moodu seç.",
@@ -140,6 +118,7 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
         ],
       },
       {
+        kind: "choice",
         key: "occasion",
         title: "Ətiri əsasən harada istifadə edəcəksən?",
         description: "İstifadə mühiti qoxunun tonunu dəyişir.",
@@ -151,6 +130,7 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
         ],
       },
       {
+        kind: "choice",
         key: "intensity",
         title: "Qoxu nə qədər hiss olunsun?",
         description: "Qalıcılıq və yayılım üçün rahatlıq səviyyəni seç.",
@@ -161,6 +141,19 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
         ],
       },
       {
+        kind: "choice",
+        key: "season",
+        title: "Əsas mövsüm hansıdır?",
+        description: "Mövsüm seçimi AI nəticəsini daha düzgün edir.",
+        options: [
+          { value: "all", label: "Bütün mövsüm", hint: "Universallıq" },
+          { value: "summer", label: "Yay", hint: "Yüngül və təravətli" },
+          { value: "winter", label: "Qış", hint: "Daha isti və dolğun" },
+          { value: "spring", label: "Yaz/Payız", hint: "Balanslı keçid qoxuları" },
+        ],
+      },
+      {
+        kind: "choice",
         key: "profile",
         title: "Hansına daha yaxınsan?",
         description: "Əsas nota ailəsi top nəticəni birbaşa təsir edir.",
@@ -173,6 +166,41 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
         ],
       },
       {
+        kind: "choice",
+        key: "longevity",
+        title: "Qalıcılıq gözləntin necədir?",
+        description: "AI bunu prioritetləşdirmədə istifadə edir.",
+        options: [
+          { value: "moderate", label: "Orta", hint: "4-6 saat yetərlidir" },
+          { value: "long", label: "Uzun", hint: "8+ saat istəyirəm" },
+          { value: "beast", label: "Maksimum", hint: "Güclü iz buraxsın" },
+        ],
+      },
+      {
+        kind: "choice",
+        key: "season",
+        title: "Əsas mövsüm hansıdır?",
+        description: "Mövsüm seçimi AI nəticəsini daha düzgün edir.",
+        options: [
+          { value: "all", label: "Bütün mövsüm", hint: "Universallıq" },
+          { value: "summer", label: "Yay", hint: "Yüngül və təravətli" },
+          { value: "winter", label: "Qış", hint: "Daha isti və dolğun" },
+          { value: "spring", label: "Yaz/Payız", hint: "Balanslı keçid qoxuları" },
+        ],
+      },
+      {
+        kind: "choice",
+        key: "longevity",
+        title: "Qalıcılıq gözləntin necədir?",
+        description: "AI bunu prioritetləşdirmədə istifadə edir.",
+        options: [
+          { value: "moderate", label: "Orta", hint: "4-6 saat yetərlidir" },
+          { value: "long", label: "Uzun", hint: "8+ saat istəyirəm" },
+          { value: "beast", label: "Maksimum", hint: "Güclü iz buraxsın" },
+        ],
+      },
+      {
+        kind: "choice",
         key: "budget",
         title: "Başlanğıc büdcə aralığın nədir?",
         description: "Nəticələri büdcənə uyğun prioritetləşdiririk.",
@@ -183,181 +211,82 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
           { value: "140plus", label: "140+ AZN", hint: "Premium və niş seçimlər" },
         ],
       },
+      {
+        kind: "text",
+        key: "favoriteNotes",
+        title: "İstəyə bağlı: sevdiyin notlar varmı?",
+        description: "Məsələn: bergamot, vanil, oud, tüstülü və s.",
+        label: "Sevdiyim notlar",
+        placeholder: "Məsələn: bergamot, yaşıl çay, yüngül musk",
+      },
+      {
+        kind: "text",
+        key: "avoidNotes",
+        title: "İstəyə bağlı: istəmədiyin notlar varmı?",
+        description: "AI bu məlumatla uyğun olmayan variantları geri plana atacaq.",
+        label: "Qaçındığım notlar",
+        placeholder: "Məsələn: çox şirin vanil, ağır oud, tüstü",
+      },
     ],
   },
   en: {
     eyebrow: "Find Your Scent",
-    title: "Discover your match with 6 quick questions",
-    description:
-      "Answer the quiz step by step. We will rank and return the top 3 scent matches for your profile.",
+    title: "Find your match with smarter questions",
+    description: "Answer option-based questions and optional text prompts for AI-personalized picks.",
     stepsLabel: "Step",
     progressLabel: "Progress",
     next: "Next",
     previous: "Back",
     restart: "Start again",
     seeCatalog: "Open catalog",
-    resultTitle: "Your top 3 scent matches",
-    resultDescription:
-      "Results are calculated from your answers. You can restart and compare different profiles anytime.",
+    resultTitle: "Top 3 picks generated with AI",
+    resultDescription: "This result is generated from both your selected options and optional text preferences.",
+    generating: "AI is generating your result...",
     noMatchTitle: "No strong match found",
-    noMatchDescription:
-      "Your filters may be too strict. Restart and select broader options for better matching.",
-    questions: [
-      {
-        key: "gender",
-        title: "What category are you mainly shopping for?",
-        description: "This helps us group options with better relevance.",
-        options: [
-          { value: "all", label: "No preference", hint: "Women, men, and unisex" },
-          { value: "unisex", label: "Unisex", hint: "Balanced universal profiles" },
-          { value: "female", label: "Women", hint: "Softer and elegant profile" },
-          { value: "male", label: "Men", hint: "Deeper and stronger profile" },
-        ],
-      },
-      {
-        key: "vibe",
-        title: "What vibe should your scent have?",
-        description: "Pick the mood you want to wear most often.",
-        options: [
-          { value: "fresh", label: "Fresh & clean", hint: "Citrus, green, airy" },
-          { value: "warm", label: "Warm & cozy", hint: "Vanilla, amber, comfort" },
-          { value: "floral", label: "Floral & elegant", hint: "Rose, jasmine, soft" },
-          { value: "bold", label: "Bold & statement", hint: "Oud, leather, spice" },
-        ],
-      },
-      {
-        key: "occasion",
-        title: "Where will you use it most?",
-        description: "Usage context changes what feels right.",
-        options: [
-          { value: "daily", label: "Daily wear", hint: "Versatile all-round picks" },
-          { value: "office", label: "Office", hint: "Clean and non-overpowering" },
-          { value: "date", label: "Date", hint: "Close-range attractive vibe" },
-          { value: "evening", label: "Evening", hint: "Richer deeper presence" },
-        ],
-      },
-      {
-        key: "intensity",
-        title: "How strong should it feel?",
-        description: "Choose your comfort level for projection and presence.",
-        options: [
-          { value: "soft", label: "Soft", hint: "Subtle and close" },
-          { value: "balanced", label: "Balanced", hint: "Safe daily middle ground" },
-          { value: "strong", label: "Strong", hint: "Expressive and long-lasting" },
-        ],
-      },
-      {
-        key: "profile",
-        title: "Which scent family do you prefer?",
-        description: "This has the strongest impact on your top ranking.",
-        options: [
-          { value: "citrus", label: "Citrus", hint: "Bergamot, lemon, neroli" },
-          { value: "floral", label: "Floral", hint: "Rose, jasmine, iris" },
-          { value: "woody", label: "Woody", hint: "Sandalwood, cedar, vetiver" },
-          { value: "amber", label: "Amber/Sweet", hint: "Vanilla, tonka, resin" },
-          { value: "oud", label: "Oud/Smoky", hint: "Leather, smoke, dark woods" },
-        ],
-      },
-      {
-        key: "budget",
-        title: "Your preferred starting budget?",
-        description: "We prioritize matches within your budget range.",
-        options: [
-          { value: "all", label: "No preference", hint: "Any price range" },
-          { value: "under80", label: "Below 80 AZN", hint: "Value-driven picks" },
-          { value: "80to140", label: "80-140 AZN", hint: "Balanced mid tier" },
-          { value: "140plus", label: "140+ AZN", hint: "Premium and niche" },
-        ],
-      },
-    ],
+    noMatchDescription: "Your filters may be too strict. Restart and select broader options.",
+    aiQuestionsLabel: "AI follow-up questions",
+    fallbackNotice: "AI is currently unavailable, showing default smart results.",
+    sameResultNotice: "AI returned the same top picks for this profile.",
+    failed: "Could not get AI recommendations. Please try again.",
+    apiMissing: "AI is not configured. Add QOXUNU_OPENAI_API_KEY.",
+    questions: [],
   },
   ru: {
     eyebrow: "Подбор аромата",
-    title: "Найдите свой аромат за 6 коротких шагов",
-    description:
-      "Ответьте на вопросы по очереди, и система подберет для вас 3 наиболее подходящих аромата.",
+    title: "Подберем аромат с умными вопросами",
+    description: "Ответьте на вопросы с вариантами и добавьте текстовые пожелания по желанию.",
     stepsLabel: "Шаг",
     progressLabel: "Прогресс",
     next: "Далее",
     previous: "Назад",
     restart: "Начать заново",
     seeCatalog: "Открыть каталог",
-    resultTitle: "Ваши топ-3 аромата",
-    resultDescription:
-      "Результат рассчитывается по вашим ответам. При желании можно пройти тест заново и сравнить варианты.",
+    resultTitle: "Топ-3 варианта от AI",
+    resultDescription: "Результат создан по вашим выборам и дополнительным текстовым пожеланиям.",
+    generating: "AI готовит результат...",
     noMatchTitle: "Точное совпадение не найдено",
-    noMatchDescription:
-      "Фильтры могли получиться слишком узкими. Попробуйте более широкие параметры.",
-    questions: [
-      {
-        key: "gender",
-        title: "Для какой категории вы ищете аромат?",
-        description: "Это помогает точнее сузить подходящие варианты.",
-        options: [
-          { value: "all", label: "Без разницы", hint: "Женские, мужские и унисекс" },
-          { value: "unisex", label: "Унисекс", hint: "Сбалансированный универсальный стиль" },
-          { value: "female", label: "Женские", hint: "Более мягкий и элегантный профиль" },
-          { value: "male", label: "Мужские", hint: "Более глубокий и выразительный профиль" },
-        ],
-      },
-      {
-        key: "vibe",
-        title: "Какое настроение должен передавать аромат?",
-        description: "Выберите атмосферу, которая вам ближе всего.",
-        options: [
-          { value: "fresh", label: "Свежий", hint: "Цитрус, зелень, легкость" },
-          { value: "warm", label: "Теплый", hint: "Ваниль, амбра, мягкость" },
-          { value: "floral", label: "Цветочный", hint: "Роза, жасмин, нежность" },
-          { value: "bold", label: "Смелый", hint: "Уд, кожа, специи" },
-        ],
-      },
-      {
-        key: "occasion",
-        title: "Где вы будете носить его чаще всего?",
-        description: "Контекст использования сильно влияет на выбор.",
-        options: [
-          { value: "daily", label: "На каждый день", hint: "Универсальные варианты" },
-          { value: "office", label: "В офис", hint: "Аккуратный и ненавязчивый" },
-          { value: "date", label: "На встречи", hint: "Приятный шлейф на близкой дистанции" },
-          { value: "evening", label: "На вечер", hint: "Более насыщенный характер" },
-        ],
-      },
-      {
-        key: "intensity",
-        title: "Насколько выраженным должен быть аромат?",
-        description: "Выберите комфортную интенсивность и шлейф.",
-        options: [
-          { value: "soft", label: "Легкий", hint: "Тихий и деликатный" },
-          { value: "balanced", label: "Сбалансированный", hint: "Оптимально для повседневности" },
-          { value: "strong", label: "Яркий", hint: "Выразительный и стойкий" },
-        ],
-      },
-      {
-        key: "profile",
-        title: "Какая нотная семья вам ближе?",
-        description: "Этот выбор сильнее всего влияет на итоговый рейтинг.",
-        options: [
-          { value: "citrus", label: "Цитрус", hint: "Бергамот, лимон, нероли" },
-          { value: "floral", label: "Цветочный", hint: "Роза, жасмин, ирис" },
-          { value: "woody", label: "Древесный", hint: "Сандал, кедр, ветивер" },
-          { value: "amber", label: "Амбровый/Сладкий", hint: "Ваниль, тонка, смолы" },
-          { value: "oud", label: "Уд/Дымный", hint: "Кожа, дым, темные оттенки" },
-        ],
-      },
-      {
-        key: "budget",
-        title: "Какой стартовый бюджет предпочтителен?",
-        description: "Мы отдаем приоритет вариантам в вашем ценовом диапазоне.",
-        options: [
-          { value: "all", label: "Без ограничения", hint: "Любой диапазон" },
-          { value: "under80", label: "До 80 AZN", hint: "Более доступные варианты" },
-          { value: "80to140", label: "80-140 AZN", hint: "Сбалансированный средний сегмент" },
-          { value: "140plus", label: "140+ AZN", hint: "Премиум и ниша" },
-        ],
-      },
-    ],
+    noMatchDescription: "Фильтры могли получиться слишком узкими. Попробуйте более широкие параметры.",
+    aiQuestionsLabel: "Дополнительные вопросы от AI",
+    fallbackNotice: "AI сейчас недоступен, показаны стандартные умные результаты.",
+    sameResultNotice: "AI вернул те же топ-результаты для этого профиля.",
+    failed: "Не удалось получить рекомендации AI. Попробуйте снова.",
+    apiMissing: "AI не настроен. Добавьте QOXUNU_OPENAI_API_KEY.",
+    questions: [],
   },
 };
+
+QUIZ_DICTIONARY.en.questions = QUIZ_DICTIONARY.az.questions.map((question) => {
+  if (question.kind === "choice") {
+    return { ...question };
+  }
+  return { ...question };
+});
+QUIZ_DICTIONARY.ru.questions = QUIZ_DICTIONARY.az.questions.map((question) => {
+  if (question.kind === "choice") {
+    return { ...question };
+  }
+  return { ...question };
+});
 
 const KEYWORDS = {
   vibe: {
@@ -384,6 +313,17 @@ const KEYWORDS = {
     amber: ["amber", "vanilla", "tonka", "benzoin", "resin", "sweet"],
     oud: ["oud", "smoke", "leather", "incense", "tobacco"],
   },
+  season: {
+    summer: ["citrus", "marine", "aquatic", "green", "neroli"],
+    winter: ["amber", "vanilla", "oud", "tobacco", "incense"],
+    spring: ["floral", "green", "citrus", "woody"],
+    all: ["floral", "woody", "citrus", "amber"],
+  },
+  longevity: {
+    moderate: ["citrus", "green", "tea", "light"],
+    long: ["amber", "woody", "musk", "resin"],
+    beast: ["oud", "leather", "tobacco", "incense", "patchouli"],
+  },
 } as const;
 
 const INITIAL_ANSWERS: QuizAnswers = {
@@ -393,15 +333,14 @@ const INITIAL_ANSWERS: QuizAnswers = {
   intensity: "",
   profile: "",
   budget: "",
+  season: "",
+  longevity: "",
 };
 
-function getStartingPrice(perfume: Perfume) {
-  if (!perfume.sizes.length) {
-    return Number.POSITIVE_INFINITY;
-  }
-
-  return perfume.sizes.reduce((min, item) => (item.price < min ? item.price : min), perfume.sizes[0].price);
-}
+const INITIAL_TEXT_ANSWERS: TextAnswers = {
+  favoriteNotes: "",
+  avoidNotes: "",
+};
 
 function normalize(value: string) {
   return value.trim().toLowerCase();
@@ -427,77 +366,66 @@ function countMatches(tokens: string[], keywords: readonly string[]) {
   return score;
 }
 
+function getStartingPrice(perfume: Perfume) {
+  if (!perfume.sizes.length) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  return perfume.sizes.reduce((min, item) => (item.price < min ? item.price : min), perfume.sizes[0].price);
+}
+
 function scorePerfume(perfume: Perfume, answers: QuizAnswers) {
   const tokens = collectPerfumeTokens(perfume);
   let score = 0;
 
   const gender = normalize(perfume.gender);
   if (answers.gender && answers.gender !== "all") {
-    if (gender.includes(answers.gender)) {
-      score += 6;
-    } else if (gender.includes("unisex")) {
-      score += 3;
-    } else {
-      score -= 2;
-    }
+    if (gender.includes(answers.gender)) score += 6;
+    else if (gender.includes("unisex")) score += 3;
+    else score -= 2;
   }
 
-  if (answers.vibe && answers.vibe in KEYWORDS.vibe) {
-    score += countMatches(tokens, KEYWORDS.vibe[answers.vibe as keyof typeof KEYWORDS.vibe]) * 2.2;
-  }
-
-  if (answers.occasion && answers.occasion in KEYWORDS.occasion) {
-    score += countMatches(tokens, KEYWORDS.occasion[answers.occasion as keyof typeof KEYWORDS.occasion]) * 1.8;
-  }
-
-  if (answers.intensity && answers.intensity in KEYWORDS.intensity) {
-    score += countMatches(tokens, KEYWORDS.intensity[answers.intensity as keyof typeof KEYWORDS.intensity]) * 1.5;
-  }
-
-  if (answers.profile && answers.profile in KEYWORDS.profile) {
-    score += countMatches(tokens, KEYWORDS.profile[answers.profile as keyof typeof KEYWORDS.profile]) * 2.8;
-  }
+  if (answers.vibe && answers.vibe in KEYWORDS.vibe) score += countMatches(tokens, KEYWORDS.vibe[answers.vibe as keyof typeof KEYWORDS.vibe]) * 2.2;
+  if (answers.occasion && answers.occasion in KEYWORDS.occasion) score += countMatches(tokens, KEYWORDS.occasion[answers.occasion as keyof typeof KEYWORDS.occasion]) * 1.8;
+  if (answers.intensity && answers.intensity in KEYWORDS.intensity) score += countMatches(tokens, KEYWORDS.intensity[answers.intensity as keyof typeof KEYWORDS.intensity]) * 1.5;
+  if (answers.profile && answers.profile in KEYWORDS.profile) score += countMatches(tokens, KEYWORDS.profile[answers.profile as keyof typeof KEYWORDS.profile]) * 2.8;
+  if (answers.season && answers.season in KEYWORDS.season) score += countMatches(tokens, KEYWORDS.season[answers.season as keyof typeof KEYWORDS.season]) * 1.2;
+  if (answers.longevity && answers.longevity in KEYWORDS.longevity) score += countMatches(tokens, KEYWORDS.longevity[answers.longevity as keyof typeof KEYWORDS.longevity]) * 1.2;
 
   const price = getStartingPrice(perfume);
-  if (answers.budget === "under80") {
-    score += price <= 80 ? 3 : -1;
-  } else if (answers.budget === "80to140") {
-    score += price >= 80 && price <= 140 ? 3 : -1;
-  } else if (answers.budget === "140plus") {
-    score += price >= 140 ? 3 : -1;
-  }
+  if (answers.budget === "under80") score += price <= 80 ? 3 : -1;
+  else if (answers.budget === "80to140") score += price >= 80 && price <= 140 ? 3 : -1;
+  else if (answers.budget === "140plus") score += price >= 140 ? 3 : -1;
 
-  if (perfume.inStock) {
-    score += 1.2;
-  }
+  if (perfume.inStock) score += 1.2;
 
   return score;
 }
 
 export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; locale: Locale }) {
   const dictionary = QUIZ_DICTIONARY[locale];
-  const aiCopy = AI_COPY[locale];
   const [answers, setAnswers] = useState<QuizAnswers>(INITIAL_ANSWERS);
+  const [textAnswers, setTextAnswers] = useState<TextAnswers>(INITIAL_TEXT_ANSWERS);
   const [stepIndex, setStepIndex] = useState(0);
   const [questionCardHeight, setQuestionCardHeight] = useState<number | null>(null);
-  const [aiPrompt, setAiPrompt] = useState("");
   const [aiMatches, setAiMatches] = useState<Perfume[] | null>(null);
   const [aiFollowUps, setAiFollowUps] = useState<string[]>([]);
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [aiNotice, setAiNotice] = useState("");
+  const [hasGeneratedAi, setHasGeneratedAi] = useState(false);
+
   const questionCardRef = useRef<HTMLDivElement | null>(null);
   const questionCardInnerRef = useRef<HTMLDivElement | null>(null);
-  const totalSteps = dictionary.questions.length;
+  const lastGeneratedRef = useRef("");
 
+  const totalSteps = dictionary.questions.length;
   const isComplete = stepIndex >= totalSteps;
   const currentStepIndex = Math.min(stepIndex, Math.max(totalSteps - 1, 0));
   const currentQuestion = dictionary.questions[currentStepIndex];
-  const currentAnswer = answers[currentQuestion.key];
 
   const topMatches = useMemo(() => {
-    if (!isComplete) {
-      return [] as Perfume[];
-    }
+    if (!isComplete) return [] as Perfume[];
 
     return [...perfumes]
       .map((perfume) => ({ perfume, score: scorePerfume(perfume, answers) }))
@@ -507,23 +435,19 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   }, [answers, isComplete, perfumes]);
 
   const perfumesBySlug = useMemo(() => new Map(perfumes.map((item) => [item.slug, item])), [perfumes]);
-
   const shownMatches = aiMatches && aiMatches.length ? aiMatches : topMatches;
 
-  const progress = Math.round(((Math.min(stepIndex, totalSteps)) / totalSteps) * 100);
+  const progress = Math.round((Math.min(stepIndex, totalSteps) / totalSteps) * 100);
+  const currentAnswer = currentQuestion.kind === "choice" ? answers[currentQuestion.key] : textAnswers[currentQuestion.key];
 
   const onSelect = (value: string) => {
-    setAnswers((prev) => ({
-      ...prev,
-      [currentQuestion.key]: value,
-    }));
+    if (currentQuestion.kind !== "choice") return;
+
+    setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
   };
 
   const onNext = () => {
-    if (!currentAnswer) {
-      return;
-    }
-
+    if (currentQuestion.kind === "choice" && !currentAnswer) return;
     setStepIndex((prev) => Math.min(prev + 1, totalSteps));
   };
 
@@ -533,27 +457,34 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
   const onRestart = () => {
     setAnswers(INITIAL_ANSWERS);
+    setTextAnswers(INITIAL_TEXT_ANSWERS);
     setStepIndex(0);
-    setAiPrompt("");
     setAiMatches(null);
     setAiFollowUps([]);
     setAiError("");
+    setAiNotice("");
+    setHasGeneratedAi(false);
+    lastGeneratedRef.current = "";
   };
 
   const requestAiRecommendations = async () => {
     setIsAiLoading(true);
     setAiError("");
+    setAiNotice("");
 
     try {
       const response = await fetch("/api/qoxunu/recommend", {
         method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           locale,
           answers,
-          freeText: aiPrompt,
+          freeText: [
+            textAnswers.favoriteNotes.trim() ? `favorites: ${textAnswers.favoriteNotes.trim()}` : "",
+            textAnswers.avoidNotes.trim() ? `avoid: ${textAnswers.avoidNotes.trim()}` : "",
+          ]
+            .filter(Boolean)
+            .join("\n"),
           fallbackSlugs: topMatches.map((item) => item.slug),
         }),
       });
@@ -562,12 +493,14 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
         slugs?: string[];
         followUpQuestions?: string[];
         error?: string;
+        usedFallback?: boolean;
       };
 
       if (!response.ok) {
         const normalizedError = (payload.error || "").toLowerCase();
-        setAiError(normalizedError.includes("openai_api_key") ? aiCopy.apiMissing : payload.error || aiCopy.failed);
+        setAiError(normalizedError.includes("openai_api_key") ? dictionary.apiMissing : payload.error || dictionary.failed);
         setIsAiLoading(false);
+        setHasGeneratedAi(true);
         return;
       }
 
@@ -575,19 +508,42 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
         .map((slug) => perfumesBySlug.get(slug))
         .filter((item): item is Perfume => Boolean(item));
 
+      if (payload.usedFallback) {
+        setAiNotice(dictionary.fallbackNotice);
+      } else {
+        const currentTopSlugs = topMatches.map((item) => item.slug).join("|");
+        const mappedSlugs = mapped.map((item) => item.slug).join("|");
+        if (mappedSlugs && mappedSlugs === currentTopSlugs) {
+          setAiNotice(dictionary.sameResultNotice);
+        }
+      }
+
       setAiMatches(mapped.length ? mapped : null);
       setAiFollowUps((payload.followUpQuestions ?? []).slice(0, 3));
+      setHasGeneratedAi(true);
     } catch {
-      setAiError(aiCopy.failed);
+      setAiError(dictionary.failed);
+      setHasGeneratedAi(true);
     } finally {
       setIsAiLoading(false);
     }
   };
 
+  const generationKey = useMemo(
+    () => JSON.stringify({ answers, textAnswers, topSlugs: topMatches.map((item) => item.slug) }),
+    [answers, textAnswers, topMatches],
+  );
+
+  useEffect(() => {
+    if (!isComplete || isAiLoading || hasGeneratedAi) return;
+    if (generationKey === lastGeneratedRef.current) return;
+
+    lastGeneratedRef.current = generationKey;
+    void requestAiRecommendations();
+  }, [generationKey, hasGeneratedAi, isAiLoading, isComplete]);
+
   useLayoutEffect(() => {
-    if (isComplete || !questionCardRef.current || !questionCardInnerRef.current) {
-      return;
-    }
+    if (isComplete || !questionCardRef.current || !questionCardInnerRef.current) return;
 
     const currentHeight = questionCardRef.current.getBoundingClientRect().height;
     const nextHeight = questionCardInnerRef.current.getBoundingClientRect().height;
@@ -611,7 +567,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
       window.cancelAnimationFrame(frameId);
       window.clearTimeout(timeoutId);
     };
-  }, [currentQuestion.key, isComplete]);
+  }, [currentQuestion, isComplete]);
 
   return (
     <section className="mx-auto w-full max-w-6xl px-2 pb-6 pt-3 sm:px-3 sm:pt-4 lg:px-4">
@@ -649,30 +605,48 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
             <h2 className="text-[1.85rem] leading-tight text-zinc-900 sm:text-[2rem]">{currentQuestion.title}</h2>
             <p className="mt-1.5 text-[0.95rem] text-zinc-500 sm:text-base">{currentQuestion.description}</p>
 
-            <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
-              {currentQuestion.options.map((option, index) => {
-                const active = currentAnswer === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => onSelect(option.value)}
-                    style={{ animationDelay: `${index * 80}ms` }}
-                    className={[
-                      "quiz-option-reveal rounded-2xl border px-3 py-3 text-left transition-all duration-300 sm:px-4 sm:py-4",
-                      active
-                        ? "border-zinc-900 bg-zinc-900 text-white shadow-[0_16px_34px_rgba(18,18,20,0.2)]"
+            {currentQuestion.kind === "choice" ? (
+              <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
+                {currentQuestion.options.map((option, index) => {
+                  const active = currentAnswer === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => onSelect(option.value)}
+                      style={{ animationDelay: `${index * 80}ms` }}
+                      className={[
+                        "quiz-option-reveal rounded-2xl border px-3 py-3 text-left transition-all duration-300 sm:px-4 sm:py-4",
+                        active
+                          ? "border-zinc-900 bg-zinc-900 text-white shadow-[0_16px_34px_rgba(18,18,20,0.2)]"
                           : "border-zinc-300/85 bg-[#f3f3f2] text-zinc-700 md:hover:border-zinc-400 md:hover:bg-zinc-100/50",
-                    ].join(" ")}
-                  >
-                    <p className="text-[0.97rem] font-semibold sm:text-[1rem]">{option.label}</p>
-                    <p className={["mt-1 hidden text-xs sm:block sm:text-sm", active ? "text-zinc-300" : "text-zinc-500"].join(" ")}>
-                      {option.hint}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
+                      ].join(" ")}
+                    >
+                      <p className="text-[0.97rem] font-semibold sm:text-[1rem]">{option.label}</p>
+                      <p className={["mt-1 hidden text-xs sm:block sm:text-sm", active ? "text-zinc-300" : "text-zinc-500"].join(" ")}>
+                        {option.hint}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <label className="mt-3 block">
+                <span className="mb-1.5 block text-sm text-zinc-700">{currentQuestion.label}</span>
+                <textarea
+                  value={textAnswers[currentQuestion.key]}
+                  onChange={(event) =>
+                    setTextAnswers((prev) => ({
+                      ...prev,
+                      [currentQuestion.key]: event.target.value,
+                    }))
+                  }
+                  rows={4}
+                  placeholder={currentQuestion.placeholder}
+                  className="w-full resize-none rounded-2xl bg-[#f7f7f6] px-4 py-3 text-sm text-zinc-800 outline-none ring-1 ring-zinc-200 transition focus:bg-white focus:ring-zinc-300"
+                />
+              </label>
+            )}
 
             <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:gap-3">
               <button
@@ -686,7 +660,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               <button
                 type="button"
                 onClick={onNext}
-                disabled={!currentAnswer}
+                disabled={currentQuestion.kind === "choice" && !currentAnswer}
                 className="inline-flex min-h-10 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-5 text-sm font-semibold text-white transition md:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-11 sm:px-6"
               >
                 {dictionary.next}
@@ -720,36 +694,11 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           </div>
 
           <div className="mt-4 rounded-[1.5rem] border border-zinc-200 bg-white px-4 py-4 sm:px-5 sm:py-5">
-            <p className="text-sm font-semibold tracking-[0.14em] text-zinc-500 uppercase">{aiCopy.title}</p>
-            <p className="mt-2 text-sm text-zinc-600">{aiCopy.description}</p>
-
-            <label className="mt-3 block">
-              <span className="mb-1.5 block text-sm text-zinc-700">{aiCopy.promptLabel}</span>
-              <textarea
-                value={aiPrompt}
-                onChange={(event) => setAiPrompt(event.target.value)}
-                rows={4}
-                placeholder={aiCopy.promptPlaceholder}
-                className="w-full resize-none rounded-2xl bg-[#f7f7f6] px-4 py-3 text-sm text-zinc-800 outline-none ring-1 ring-zinc-200 transition focus:bg-white focus:ring-zinc-300"
-              />
-            </label>
-
-            <p className="mt-2 text-xs text-zinc-500">{aiCopy.promptHint}</p>
-
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={requestAiRecommendations}
-                disabled={isAiLoading}
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {isAiLoading ? aiCopy.running : aiCopy.run}
-              </button>
-            </div>
+            {isAiLoading ? <p className="text-sm text-zinc-600">{dictionary.generating}</p> : null}
 
             {aiFollowUps.length ? (
-              <div className="mt-4 rounded-2xl bg-[#f7f7f6] px-4 py-3 ring-1 ring-zinc-200">
-                <p className="text-xs font-semibold tracking-[0.14em] text-zinc-500 uppercase">{aiCopy.followUps}</p>
+              <div className="rounded-2xl bg-[#f7f7f6] px-4 py-3 ring-1 ring-zinc-200">
+                <p className="text-xs font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiQuestionsLabel}</p>
                 <ul className="mt-2 space-y-1.5 text-sm text-zinc-700">
                   {aiFollowUps.map((item) => (
                     <li key={item}>• {item}</li>
@@ -758,6 +707,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               </div>
             ) : null}
 
+            {aiNotice ? <p className="mt-3 text-sm text-amber-700">{aiNotice}</p> : null}
             {aiError ? <p className="mt-3 text-sm text-rose-600">{aiError}</p> : null}
           </div>
 

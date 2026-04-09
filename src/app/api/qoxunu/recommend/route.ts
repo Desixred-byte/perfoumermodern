@@ -254,7 +254,12 @@ export async function POST(request: Request) {
 
   if (!completionResponse.ok) {
     const fallback = (body.fallbackSlugs ?? []).slice(0, 3);
-    return NextResponse.json({ slugs: fallback, followUpQuestions: [] });
+    return NextResponse.json({
+      slugs: fallback,
+      followUpQuestions: [],
+      usedFallback: true,
+      warning: "provider_unavailable",
+    });
   }
 
   const completionJson = (await completionResponse.json()) as {
@@ -273,9 +278,12 @@ export async function POST(request: Request) {
   const fallback = (body.fallbackSlugs ?? []).filter((slug) => allowedSlugs.has(slug));
 
   const finalSlugs = [...uniqueSelected, ...fallback].slice(0, 3);
+  const usedFallback = uniqueSelected.length === 0;
 
   return NextResponse.json({
     slugs: finalSlugs,
     followUpQuestions: (parsed.followUpQuestions ?? []).slice(0, 3),
+    usedFallback,
+    warning: usedFallback ? "no_ai_selection" : null,
   });
 }
