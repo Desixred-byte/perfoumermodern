@@ -83,8 +83,9 @@ const fallbackNote = (slug: string): Note => ({
   content: "",
 });
 
-const csvPath = (...segments: string[]) =>
-  path.join(process.cwd(), "data", ...segments);
+const NOTES_CSV_PATH = path.join(process.cwd(), "data", "Notes.csv");
+const NOTES_CSV_FALLBACK_PATH = path.join(process.cwd(), "data", "notes.csv");
+const PERFUMES_CSV_PATH = path.join(process.cwd(), "data", "perfumes.csv");
 
 const PERFUME_CDN_BASE_URL = "https://perfoumer-cdn.vercel.app/perfumes";
 
@@ -113,8 +114,8 @@ const rotateBySeed = <T,>(items: T[], seed: string) => {
 const getDailySeed = () => new Date().toISOString().slice(0, 10);
 
 export const getNotes = cache(async (): Promise<Note[]> => {
-  const raw = await readFile(csvPath("Notes.csv"), "utf-8").catch(() =>
-    readFile(csvPath("notes.csv"), "utf-8"),
+  const raw = await readFile(NOTES_CSV_PATH, "utf-8").catch(() =>
+    readFile(NOTES_CSV_FALLBACK_PATH, "utf-8"),
   );
   const rows = parseCsv<NoteCsvRow>(raw);
 
@@ -128,7 +129,7 @@ export const getNotes = cache(async (): Promise<Note[]> => {
 });
 
 export const getPerfumes = cache(async (): Promise<Perfume[]> => {
-  const raw = await readFile(csvPath("perfumes.csv"), "utf-8");
+  const raw = await readFile(PERFUMES_CSV_PATH, "utf-8");
   const rows = parseCsv<PerfumeCsvRow>(raw);
 
   const bySlug = new Map<string, Perfume>();
