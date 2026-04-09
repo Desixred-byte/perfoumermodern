@@ -318,6 +318,155 @@ h6 {
     visibility 0ms linear 180ms;
 }
 
+.wishlist-pill {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  transform: translateZ(0);
+  transition:
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 260ms ease,
+    border-color 260ms ease,
+    color 260ms ease;
+}
+
+.wishlist-pill::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: 999px;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0) 24%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0) 76%),
+    radial-gradient(circle at 18% 10%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 48%);
+  opacity: 0;
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.wishlist-pill--idle:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(24, 24, 24, 0.08);
+}
+
+.wishlist-pill--saved {
+  box-shadow: 0 14px 28px rgba(15, 18, 28, 0.24);
+}
+
+.wishlist-pill--saved::before {
+  animation: wishlistSheen 1.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wishlist-pill-icon {
+  display: inline-grid;
+  place-items: center;
+  transform-origin: center;
+}
+
+.wishlist-pill-icon--pop {
+  animation: wishlistIconPop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.wishlist-pill-icon--fall {
+  animation: wishlistIconFall 460ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.wishlist-pill--save-burst {
+  animation: wishlistSaveBurst 600ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.wishlist-pill--remove-swipe {
+  animation: wishlistRemoveSwipe 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes wishlistSheen {
+  0% {
+    opacity: 0;
+    transform: translateX(-120%);
+  }
+  30% {
+    opacity: 0.88;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(120%);
+  }
+}
+
+@keyframes wishlistSaveBurst {
+  0% {
+    transform: scale(0.94) translateY(1px);
+    box-shadow: 0 0 0 rgba(10, 13, 20, 0.12);
+  }
+  44% {
+    transform: scale(1.06) translateY(-1px);
+    box-shadow: 0 18px 34px rgba(10, 13, 20, 0.32);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    box-shadow: 0 14px 28px rgba(15, 18, 28, 0.24);
+  }
+}
+
+@keyframes wishlistRemoveSwipe {
+  0% {
+    transform: scale(1) translateX(0);
+  }
+  38% {
+    transform: scale(0.98) translateX(-2px);
+  }
+  66% {
+    transform: scale(1.01) translateX(3px);
+  }
+  100% {
+    transform: scale(1) translateX(0);
+  }
+}
+
+@keyframes wishlistIconPop {
+  0% {
+    transform: scale(0.72) rotate(-14deg);
+    filter: brightness(1);
+  }
+  52% {
+    transform: scale(1.24) rotate(10deg);
+    filter: brightness(1.12);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@keyframes wishlistIconFall {
+  0% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  55% {
+    transform: scale(0.8) rotate(-10deg);
+    filter: brightness(0.92);
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist-pill,
+  .wishlist-pill::before,
+  .wishlist-pill-icon,
+  .wishlist-pill-icon--pop,
+  .wishlist-pill-icon--fall,
+  .wishlist-pill--save-burst,
+  .wishlist-pill--remove-swipe,
+  .wishlist-pill--saved::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
 .catalog-dropdown-panel[data-open="true"] {
   opacity: 1;
   visibility: visible;

@@ -38,6 +38,7 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
   const [session, setSession] = useState<Session | null>(null);
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [buttonFx, setButtonFx] = useState<"save" | "remove" | null>(null);
 
   const loginHref = useMemo(() => {
     const nextPath = pathname || `/perfumes/${perfumeSlug}`;
@@ -98,6 +99,20 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
     };
   }, [supabase, session?.user, perfumeSlug]);
 
+  useEffect(() => {
+    if (!buttonFx) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setButtonFx(null);
+    }, 620);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [buttonFx]);
+
   const toggleWishlist = async () => {
     if (!isSupabaseConfigured(supabaseConfig ?? undefined) || !supabase) {
       return;
@@ -117,6 +132,7 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
         .eq("user_id", session.user.id)
         .eq("perfume_slug", perfumeSlug);
       setIsInWishlist(false);
+      setButtonFx("remove");
       setIsSubmitting(false);
       return;
     }
@@ -126,6 +142,7 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
       perfume_slug: perfumeSlug,
     });
     setIsInWishlist(true);
+    setButtonFx("save");
     setIsSubmitting(false);
   };
 
@@ -135,15 +152,25 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
       onClick={toggleWishlist}
       disabled={isSubmitting}
       className={[
-        "inline-flex h-12 items-center gap-2 rounded-full border px-5 text-sm font-medium transition",
+        "wishlist-pill inline-flex h-12 items-center gap-2 rounded-full border px-5 text-sm font-medium",
         isInWishlist
-          ? "border-zinc-900 bg-zinc-900 text-white"
-          : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
+          ? "wishlist-pill--saved border-zinc-900 bg-zinc-900 text-white"
+          : "wishlist-pill--idle border-zinc-300 bg-white text-zinc-700",
+        buttonFx === "save" ? "wishlist-pill--save-burst" : "",
+        buttonFx === "remove" ? "wishlist-pill--remove-swipe" : "",
         isSubmitting ? "cursor-not-allowed opacity-60" : "",
       ].join(" ")}
       aria-label={isInWishlist ? copy[locale].saved : copy[locale].save}
     >
-      <Heart size={18} weight={isInWishlist ? "fill" : "regular"} />
+      <span
+        className={[
+          "wishlist-pill-icon",
+          buttonFx === "save" ? "wishlist-pill-icon--pop" : "",
+          buttonFx === "remove" ? "wishlist-pill-icon--fall" : "",
+        ].join(" ")}
+      >
+        <Heart size={18} weight={isInWishlist ? "fill" : "regular"} />
+      </span>
       {isInWishlist ? copy[locale].saved : copy[locale].save}
     </button>
   );
