@@ -21,6 +21,11 @@ export const metadata: Metadata = {
   title: "Perfoumer | Onlayn Ətirlər Mağazası - Lüks və Uzunömürlü Ətirlər",
   description:
     "Perfoumer-də orijinal və uzunömürlü kişi və qadın ətirlərini kəşf edin. Lüks, niş və dizayner brendləri, sürətli çatdırılma və xüsusi kolleksiyalar - hamısı bir onlayn ətir mağazasında.",
+  icons: {
+    icon: "/logo.webp",
+    shortcut: "/logo.webp",
+    apple: "/logo.webp",
+  },
   openGraph: {
     title: "Perfoumer | Onlayn Ətirlər Mağazası - Lüks və Uzunömürlü Ətirlər",
     description:
@@ -28,9 +33,9 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/logo.webp",
-        width: 1200,
-        height: 630,
+        url: "https://images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless&width=1404&height=787",
+        width: 1404,
+        height: 787,
         alt: "Perfoumer",
       },
     ],
@@ -40,7 +45,9 @@ export const metadata: Metadata = {
     title: "Perfoumer | Onlayn Ətirlər Mağazası - Lüks və Uzunömürlü Ətirlər",
     description:
       "Perfoumer-də orijinal və uzunömürlü kişi və qadın ətirlərini kəşf edin. Lüks, niş və dizayner brendləri, sürətli çatdırılma və xüsusi kolleksiyalar - hamısı bir onlayn ətir mağazasında.",
-    images: ["/logo.webp"],
+    images: [
+      "https://images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless&width=1404&height=787",
+    ],
   },
 };
 
