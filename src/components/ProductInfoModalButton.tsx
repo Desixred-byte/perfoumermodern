@@ -15,11 +15,9 @@ export function ProductInfoModalButton({ locale }: ProductInfoModalButtonProps) 
 
   const openModal = () => {
     setIsMounted(true);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        setIsVisible(true);
-      });
-    });
+    window.setTimeout(() => {
+      setIsVisible(true);
+    }, 10);
   };
 
   const closeModal = () => {
@@ -56,7 +54,9 @@ export function ProductInfoModalButton({ locale }: ProductInfoModalButtonProps) 
       <button
         type="button"
         onClick={openModal}
+        onTouchStart={openModal}
         className="mx-auto flex items-center justify-center gap-2 text-center text-[1.05rem] text-zinc-500 transition-colors duration-300 hover:text-zinc-800"
+        style={{ WebkitTapHighlightColor: "transparent", touchAction: "manipulation" }}
       >
         <Info size={18} weight="fill" className="text-current" />
         {t.modal.title}
@@ -65,11 +65,13 @@ export function ProductInfoModalButton({ locale }: ProductInfoModalButtonProps) 
       {isMounted ? (
         <div
           className={[
-            "fixed inset-0 z-[70] flex items-end justify-center px-3 py-4 transition-all duration-200 sm:items-center sm:px-4",
+            "fixed inset-0 z-[90] flex items-end justify-center px-3 py-4 transition-all duration-200 sm:items-center sm:px-4",
             isVisible
               ? "bg-[#f3f3f2]/62 backdrop-blur-sm"
               : "bg-[#f3f3f2]/0 backdrop-blur-none",
           ].join(" ")}
+          role="dialog"
+          aria-modal="true"
           onClick={closeModal}
         >
           <div

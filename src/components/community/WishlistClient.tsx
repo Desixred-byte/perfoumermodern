@@ -28,6 +28,11 @@ type Copy = {
   loading: string;
   noItems: string;
   remove: string;
+  confirmRemoveTitle: string;
+  confirmRemoveBody: string;
+  cancel: string;
+  confirm: string;
+  removing: string;
   signedInAs: string;
 };
 
@@ -43,6 +48,11 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Yüklənir...",
     noItems: "Wishlist boşdur. Məhsul səhifəsindən əlavə edə bilərsən.",
     remove: "Sil",
+    confirmRemoveTitle: "Wishlist-dən silinsin?",
+    confirmRemoveBody: "{name} məhsulu istək siyahısından silinəcək.",
+    cancel: "Ləğv et",
+    confirm: "Bəli, sil",
+    removing: "Silinir...",
     signedInAs: "Hesab",
   },
   en: {
@@ -56,6 +66,11 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Loading...",
     noItems: "Your wishlist is empty. Add perfumes from product pages.",
     remove: "Remove",
+    confirmRemoveTitle: "Remove from wishlist?",
+    confirmRemoveBody: "{name} will be removed from your wishlist.",
+    cancel: "Cancel",
+    confirm: "Yes, remove",
+    removing: "Removing...",
     signedInAs: "Account",
   },
   ru: {
@@ -69,6 +84,11 @@ const copyByLocale: Record<Locale, Copy> = {
     loading: "Загрузка...",
     noItems: "Wishlist пока пуст. Добавляйте ароматы со страницы товара.",
     remove: "Удалить",
+    confirmRemoveTitle: "Удалить из wishlist?",
+    confirmRemoveBody: "{name} будет удален из вашего wishlist.",
+    cancel: "Отмена",
+    confirm: "Да, удалить",
+    removing: "Удаление...",
     signedInAs: "Аккаунт",
   },
 };
@@ -82,6 +102,8 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
   const [isListLoading, setIsListLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [wishlists, setWishlists] = useState<WishlistRow[]>([]);
+  const [pendingDelete, setPendingDelete] = useState<Perfume | null>(null);
+  const [isRemoving, setIsRemoving] = useState(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -189,6 +211,17 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
     setWishlists((prev) => prev.filter((item) => item.perfume_slug !== perfumeSlug));
   };
 
+  const confirmRemove = async () => {
+    if (!pendingDelete) {
+      return;
+    }
+
+    setIsRemoving(true);
+    await removeFromWishlist(pendingDelete.slug);
+    setIsRemoving(false);
+    setPendingDelete(null);
+  };
+
   if (!isSupabaseConfigured(supabaseConfig ?? undefined)) {
     return <p className="text-sm text-zinc-600">{copy.configMissing}</p>;
   }
@@ -233,13 +266,53 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
               <ProductCard perfume={perfume} locale={locale} />
               <button
                 type="button"
-                onClick={() => removeFromWishlist(perfume.slug)}
+                onClick={() => setPendingDelete(perfume)}
                 className="inline-flex min-h-10 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50"
               >
                 {copy.remove}
               </button>
             </div>
           ))}
+        </div>
+      ) : null}
+
+      {pendingDelete ? (
+        <div
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/35 p-3 backdrop-blur-[2px] sm:items-center sm:p-4"
+          onClick={() => {
+            if (!isRemoving) {
+              setPendingDelete(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-[1.4rem] bg-white p-5 shadow-[0_24px_60px_rgba(15,15,15,0.24)] ring-1 ring-zinc-200 sm:p-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-2xl tracking-[-0.02em] text-zinc-900">{copy.confirmRemoveTitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">
+              {copy.confirmRemoveBody.replace("{name}", pendingDelete.name)}
+            </p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={() => setPendingDelete(null)}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-60"
+              >
+                {copy.cancel}
+              </button>
+              <button
+                type="button"
+                disabled={isRemoving}
+                onClick={confirmRemove}
+                className="inline-flex min-h-11 items-center justify-center rounded-full bg-zinc-900 px-4 text-sm font-medium text-white shadow-[0_10px_20px_rgba(20,20,20,0.24)] transition hover:bg-zinc-800 disabled:opacity-60"
+              >
+                {isRemoving ? copy.removing : copy.confirm}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 
