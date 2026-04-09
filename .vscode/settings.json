@@ -1,0 +1,11 @@
+{
+  "files.watcherExclude": {
+    "**/data/cleaned_png/**": true
+  },
+  "search.exclude": {
+    "**/data/cleaned_png/**": true
+  },
+  "files.exclude": {
+    "**/data/cleaned_png": true
+  }
+}

@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Perfoumer (Next.js)
 
-## Getting Started
+Premium və elegant ətir vitrin saytı. Dizayn istiqaməti Framer versiyasına bənzərdir: açıq fon, böyük hero, seçilmiş məhsullar və detal səhifəsində not strukturu.
 
-First, run the development server:
+## Tech Stack
+
+- Next.js (App Router, TypeScript)
+- Tailwind CSS
+- CSV data source (`data/`)
+
+## Run
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Data Structure (CSV)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 1) Perfumes CSV
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Path: `data/perfumes.csv`
 
-## Learn More
+Required columns:
 
-To learn more about Next.js, take a look at the following resources:
+- `id`
+- `slug`
+- `name`
+- `brand`
+- `gender`
+- `short_description`
+- `long_description`
+- `hero_image`
+- `card_image`
+- `price_15`
+- `price_30`
+- `price_50`
+- `top_note_ids` (pipe-separated, example: `apple|cardamom`)
+- `heart_note_ids` (pipe-separated)
+- `base_note_ids` (pipe-separated)
+- `best_seller` (`true`/`false`)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 2) Notes CSV
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Path: `data/notes.csv`
 
-## Deploy on Vercel
+Required columns:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- `id`
+- `name`
+- `category` (`top` | `heart` | `base`)
+- `image`
+- `description`
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## How join works
+
+- Hər ətirdə `top_note_ids`, `heart_note_ids`, `base_note_ids` var.
+- Hər ID `notes.csv` içindəki `id` ilə uyğunlaşdırılır.
+- Bu join `src/lib/catalog.ts` daxilində edilir və detail page üçün `notes.top`, `notes.heart`, `notes.base` şəklində qaytarılır.
+
+## Current pages
+
+- `/` → Hero + best seller məhsullar
+- `/perfumes/[slug]` → məhsul detalı + ölçü qiymətləri + not kartları
+
+## Supabase migration (next step)
+
+CSV ilə eyni schema saxlanılsa, keçid sadə olacaq:
+
+- `perfumes` cədvəli → `perfumes.csv` sütunları
+- `notes` cədvəli → `notes.csv` sütunları
+- gələcəkdə `perfume_notes` pivot table əlavə edilə bilər (daha relational model üçün)
+
+Bu quruluş intentionally modular saxlanıb ki, `src/lib/catalog.ts` içində CSV read hissəsi sonradan Supabase query ilə əvəzlənsin.

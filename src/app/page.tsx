@@ -1,65 +1,88 @@
-import Image from "next/image";
+import Link from "next/link";
+import { Footer } from "@/components/Footer";
+import { Hero } from "@/components/Hero";
+import { ProductCard } from "@/components/ProductCard";
+import { getFeaturedPerfumes } from "@/lib/catalog";
+import { getCurrentLocale } from "@/lib/i18n.server";
+import { getDictionary } from "@/lib/i18n";
 
-export default function Home() {
+export default async function Home() {
+  const locale = await getCurrentLocale();
+  const t = getDictionary(locale);
+  const featured = await getFeaturedPerfumes();
+  const stats = [
+    { value: "98%", ...t.home.stats[0] },
+    { value: "900+", ...t.home.stats[1] },
+    { value: "15k+", ...t.home.stats[2] },
+    { value: "4.9/5", ...t.home.stats[3] },
+  ];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="bg-[#f3f3f2]">
+      <div className="mx-auto max-w-[1540px] px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-5 md:px-10 md:pt-4 md:pb-6 xl:max-w-none xl:px-6 xl:pt-4 xl:pb-6">
+        <Hero
+          locale={locale}
+          backgroundImage="https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=1800&auto=format&fit=crop"
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+      </div>
+
+      <main id="products" className="mx-auto mt-10 max-w-[1540px] px-6 md:px-10">
+        <section className="text-center">
+          <p className="text-sm text-zinc-500">{t.home.bestSelling}</p>
+          <h2 className="mx-auto mt-2 max-w-[14ch] text-5xl leading-[1.05] font-semibold text-zinc-800 md:text-6xl">
+            {t.home.selectedTitle}
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-zinc-500">
+            {t.home.selectedDescription}
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        </section>
+
+        <section className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+          {featured.map((perfume) => (
+            <ProductCard key={perfume.id} perfume={perfume} locale={locale} />
+          ))}
+        </section>
+
+        <div className="mt-8 flex justify-center">
+          <Link
+            href="/catalog"
+            className="inline-flex min-h-12 items-center justify-center rounded-full border border-zinc-400 bg-transparent px-8 text-base font-medium text-zinc-700 transition-all duration-300 hover:bg-white/75 hover:shadow-[0_8px_24px_rgba(31,31,31,0.08)]"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {t.home.showMore}
+          </Link>
         </div>
+
+        <section id="about" className="mt-20 pb-8 md:mt-24">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-sm text-zinc-500">{t.home.statsEyebrow}</p>
+            <h2 className="mt-3 text-5xl leading-[0.95] tracking-[-0.02em] font-medium text-zinc-800 md:text-[4.9rem]">
+              {t.home.statsTitle}
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-zinc-500">
+              {t.home.statsDescription}
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
+            {stats.map((stat) => (
+              <article
+                key={stat.title}
+                className="flex min-h-[320px] flex-col rounded-[1.85rem] bg-white/45 p-6 shadow-[0_8px_30px_rgba(31,31,31,0.03)] ring-1 ring-white/70"
+              >
+                <p className="text-[1.05rem] font-medium text-zinc-700">{stat.title}</p>
+                <p className="stat-value mt-8 text-[4.9rem] leading-[0.94] tracking-[-0.03em] text-zinc-800 md:text-[5.4rem]">
+                  {stat.value}
+                </p>
+                <p className="mt-auto pt-6 text-[0.98rem] leading-[1.28] text-zinc-500 md:text-[1.02rem]">
+                  {stat.description}
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
       </main>
+
+      <Footer locale={locale} />
     </div>
   );
 }
