@@ -21,6 +21,48 @@ type RecommendRequest = {
   fallbackSlugs?: string[];
 };
 
+const SUMMARY_LANGUAGE: Record<NonNullable<RecommendRequest["locale"]>, string> = {
+  az: "Azerbaijani",
+  en: "English",
+  ru: "Russian",
+};
+
+function enforceSecondPersonVoice(summary: string, locale: NonNullable<RecommendRequest["locale"]>) {
+  let result = summary.trim();
+
+  if (!result) {
+    return "";
+  }
+
+  if (locale === "az") {
+    result = result
+      .replace(/\bİstifadəçi\b/g, "Siz")
+      .replace(/\bistifadəçi\b/g, "siz")
+      .replace(/\bİstifadəçinin\b/g, "Sizin")
+      .replace(/\bistifadəçinin\b/g, "sizin")
+      .replace(/\bİstifadəçiyə\b/g, "Sizə")
+      .replace(/\bistifadəçiyə\b/g, "sizə");
+  }
+
+  if (locale === "en") {
+    result = result
+      .replace(/\b[Tt]he user\b/g, "You")
+      .replace(/\b[Uu]ser's\b/g, "your")
+      .replace(/\b[Uu]ser\b/g, "you");
+  }
+
+  if (locale === "ru") {
+    result = result
+      .replace(/\bПользователь\b/g, "Вы")
+      .replace(/\bпользователь\b/g, "вы")
+      .replace(/\bпользователя\b/g, "вас")
+      .replace(/\bпользователю\b/g, "вам")
+      .replace(/\bпользовательский\b/g, "ваш");
+  }
+
+  return result;
+}
+
 const KEYWORDS = {
   vibe: {
     fresh: ["citrus", "bergamot", "lemon", "grapefruit", "marine", "aquatic", "green", "tea", "neroli"],
@@ -129,7 +171,7 @@ function scorePerfume(perfume: Perfume, answers: QuizAnswers) {
 
 function parseJsonObject(raw: string) {
   try {
-    return JSON.parse(raw) as { slugs?: string[]; followUpQuestions?: string[] };
+    return JSON.parse(raw) as { slugs?: string[]; summary?: string };
   } catch {
     const first = raw.indexOf("{");
     const last = raw.lastIndexOf("}");
@@ -138,7 +180,7 @@ function parseJsonObject(raw: string) {
     }
 
     try {
-      return JSON.parse(raw.slice(first, last + 1)) as { slugs?: string[]; followUpQuestions?: string[] };
+      return JSON.parse(raw.slice(first, last + 1)) as { slugs?: string[]; summary?: string };
     } catch {
       return {};
     }
@@ -201,6 +243,8 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json().catch(() => ({}))) as RecommendRequest;
+  const locale: NonNullable<RecommendRequest["locale"]> = body.locale === "en" || body.locale === "ru" ? body.locale : "az";
+  const summaryLanguage = SUMMARY_LANGUAGE[locale];
   const answers = body.answers ?? {};
   const freeText = (body.freeText ?? "").trim();
 
@@ -236,12 +280,13 @@ export async function POST(request: Request) {
         {
           role: "system",
           content:
-            "You are a perfume recommendation expert. Choose exactly 3 candidates by slug based on structured quiz answers and free-text preference. Return strict JSON with keys: slugs (string[]), followUpQuestions (string[] with 3 concise questions).",
+            `You are a perfume recommendation expert. Choose exactly 3 candidates by slug based on structured quiz answers and free-text preference. Return strict JSON with keys: slugs (string[]), summary (string, 1-3 short sentences explaining taste and why these picks fit). The summary language MUST be ${summaryLanguage} only. Do not switch language. Do not output English unless locale is en. Keep brand and perfume names unchanged. Address the customer directly in second person (Azerbaijani: siz, English: you, Russian: вы). Never call them "user" or equivalent third-person wording.`,
         },
         {
           role: "user",
           content: JSON.stringify({
-            locale: body.locale || "az",
+            locale,
+            summaryLanguage,
             answers,
             freeText,
             candidates,
@@ -256,7 +301,7 @@ export async function POST(request: Request) {
     const fallback = (body.fallbackSlugs ?? []).slice(0, 3);
     return NextResponse.json({
       slugs: fallback,
-      followUpQuestions: [],
+      summary: "",
       usedFallback: true,
       warning: "provider_unavailable",
     });
@@ -282,7 +327,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     slugs: finalSlugs,
-    followUpQuestions: (parsed.followUpQuestions ?? []).slice(0, 3),
+    summary: typeof parsed.summary === "string" ? enforceSecondPersonVoice(parsed.summary, locale) : "",
     usedFallback,
     warning: usedFallback ? "no_ai_selection" : null,
   });

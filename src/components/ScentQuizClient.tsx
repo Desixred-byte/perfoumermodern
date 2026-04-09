@@ -60,10 +60,21 @@ type QuizDictionary = {
   seeCatalog: string;
   resultTitle: string;
   resultDescription: string;
+  resultConfidenceLabel: string;
   generating: string;
+  generatingHint: string;
   noMatchTitle: string;
   noMatchDescription: string;
-  aiQuestionsLabel: string;
+  aiSummaryLabel: string;
+  showMore: string;
+  showLess: string;
+  topPickLabel: string;
+  otherPicksLabel: string;
+  chipProfile: string;
+  chipNotes: string;
+  chipFit: string;
+  rankedLabel: string;
+  reasonLabel: string;
   fallbackNotice: string;
   sameResultNotice: string;
   failed: string;
@@ -82,12 +93,23 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
     previous: "Geri",
     restart: "Yenidən başla",
     seeCatalog: "Kataloqa bax",
-    resultTitle: "AI ilə seçilən top 3 qoxu",
-    resultDescription: "Nəticə həm cavablara, həm də yazdığın əlavə qeydlərə əsasən yaradılıb.",
-    generating: "AI nəticəni hazırlayır...",
+    resultTitle: "Sizin üçün seçilən 3 qoxu",
+    resultDescription: "Cavablarınıza əsasən butik üslubda seçilən xüsusi kolleksiya.",
+    resultConfidenceLabel: "AI uyğunluğu",
+    generating: "Sizin qoxu profiliniz analiz olunur...",
+    generatingHint: "Nəticə bir neçə saniyə ərzində hazır olacaq.",
     noMatchTitle: "Uyğun nəticə tapılmadı",
     noMatchDescription: "Filtrlər çox dar ola bilər. Testi yenidən başlayıb daha geniş seçimlər et.",
-    aiQuestionsLabel: "AI-nin əlavə sualları",
+    aiSummaryLabel: "Sənin qoxu xülasən",
+    showMore: "Daha çox bax",
+    showLess: "Az göstər",
+    topPickLabel: "Ən uyğun seçim",
+    otherPicksLabel: "Digər variantlar",
+    chipProfile: "Sizin profiliniz",
+    chipNotes: "Sevdiyiniz notlar",
+    chipFit: "Bu seçimin səbəbi",
+    rankedLabel: "Seçim",
+    reasonLabel: "Niyə uyğundur",
     fallbackNotice: "AI hazırda əlçatan deyil, standart ağıllı nəticə göstərilir.",
     sameResultNotice: "AI nəticəsi mövcud seçimlərlə eyni qaldı.",
     failed: "AI tövsiyəsi alınmadı. Yenidən cəhd edin.",
@@ -239,12 +261,23 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
     previous: "Back",
     restart: "Start again",
     seeCatalog: "Open catalog",
-    resultTitle: "Top 3 picks generated with AI",
-    resultDescription: "This result is generated from both your selected options and optional text preferences.",
-    generating: "AI is generating your result...",
+    resultTitle: "3 picks selected for you",
+    resultDescription: "A curated set chosen from your answers and scent preferences.",
+    resultConfidenceLabel: "AI confidence",
+    generating: "We are analyzing your scent profile...",
+    generatingHint: "Your curated result will be ready in a few seconds.",
     noMatchTitle: "No strong match found",
     noMatchDescription: "Your filters may be too strict. Restart and select broader options.",
-    aiQuestionsLabel: "AI follow-up questions",
+    aiSummaryLabel: "Your scent summary",
+    showMore: "Show more",
+    showLess: "Show less",
+    topPickLabel: "Top pick",
+    otherPicksLabel: "Other options",
+    chipProfile: "Your profile",
+    chipNotes: "Preferred notes",
+    chipFit: "Why these picks",
+    rankedLabel: "Pick",
+    reasonLabel: "Why it fits",
     fallbackNotice: "AI is currently unavailable, showing default smart results.",
     sameResultNotice: "AI returned the same top picks for this profile.",
     failed: "Could not get AI recommendations. Please try again.",
@@ -261,12 +294,23 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
     previous: "Назад",
     restart: "Начать заново",
     seeCatalog: "Открыть каталог",
-    resultTitle: "Топ-3 варианта от AI",
-    resultDescription: "Результат создан по вашим выборам и дополнительным текстовым пожеланиям.",
-    generating: "AI готовит результат...",
+    resultTitle: "3 аромата, выбранные для вас",
+    resultDescription: "Персональная подборка на основе ваших ответов и предпочтений.",
+    resultConfidenceLabel: "Уверенность AI",
+    generating: "Мы анализируем ваш ароматический профиль...",
+    generatingHint: "Персональный результат будет готов через несколько секунд.",
     noMatchTitle: "Точное совпадение не найдено",
     noMatchDescription: "Фильтры могли получиться слишком узкими. Попробуйте более широкие параметры.",
-    aiQuestionsLabel: "Дополнительные вопросы от AI",
+    aiSummaryLabel: "Ваш ароматический профиль",
+    showMore: "Показать больше",
+    showLess: "Скрыть",
+    topPickLabel: "Лучший выбор",
+    otherPicksLabel: "Другие варианты",
+    chipProfile: "Ваш профиль",
+    chipNotes: "Любимые ноты",
+    chipFit: "Почему именно эти",
+    rankedLabel: "Выбор",
+    reasonLabel: "Почему подходит",
     fallbackNotice: "AI сейчас недоступен, показаны стандартные умные результаты.",
     sameResultNotice: "AI вернул те же топ-результаты для этого профиля.",
     failed: "Не удалось получить рекомендации AI. Попробуйте снова.",
@@ -402,6 +446,49 @@ function scorePerfume(perfume: Perfume, answers: QuizAnswers) {
   return score;
 }
 
+function getChoiceLabel(questions: Question[], key: keyof QuizAnswers, value: string) {
+  for (const question of questions) {
+    if (question.kind !== "choice" || question.key !== key) {
+      continue;
+    }
+
+    const option = question.options.find((item) => item.value === value);
+    return option?.label ?? "";
+  }
+
+  return "";
+}
+
+function getReasonText(locale: Locale, matchedProfile: string, tags: string[]) {
+  if (locale === "az") {
+    if (matchedProfile) {
+      return `${matchedProfile} xəttinə uyğun nota balansı sizin zövqünüzlə yaxşı uyğunlaşır.`;
+    }
+    return `${tags.join(", ")} istifadəsi üçün balanslı və rahat tərz yaradır.`;
+  }
+
+  if (locale === "ru") {
+    if (matchedProfile) {
+      return `Композиция в стиле ${matchedProfile} хорошо совпадает с вашим ароматическим профилем.`;
+    }
+    return `Сочетание ${tags.join(", ")} формирует сбалансированный и комфортный характер аромата.`;
+  }
+
+  if (matchedProfile) {
+    return `Its ${matchedProfile} direction aligns well with your scent profile.`;
+  }
+
+  return `The ${tags.join(", ")} profile creates a balanced and wearable signature.`;
+}
+
+function getResultTags(dictionary: QuizDictionary, answers: QuizAnswers) {
+  return [
+    answers.occasion ? getChoiceLabel(dictionary.questions, "occasion", answers.occasion) : "",
+    answers.season ? getChoiceLabel(dictionary.questions, "season", answers.season) : "",
+    answers.profile ? getChoiceLabel(dictionary.questions, "profile", answers.profile) : "",
+  ].filter(Boolean);
+}
+
 export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; locale: Locale }) {
   const dictionary = QUIZ_DICTIONARY[locale];
   const [answers, setAnswers] = useState<QuizAnswers>(INITIAL_ANSWERS);
@@ -409,11 +496,13 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   const [stepIndex, setStepIndex] = useState(0);
   const [questionCardHeight, setQuestionCardHeight] = useState<number | null>(null);
   const [aiMatches, setAiMatches] = useState<Perfume[] | null>(null);
-  const [aiFollowUps, setAiFollowUps] = useState<string[]>([]);
+  const [aiSummary, setAiSummary] = useState("");
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [aiNotice, setAiNotice] = useState("");
   const [hasGeneratedAi, setHasGeneratedAi] = useState(false);
+  const [isMobileLayout, setIsMobileLayout] = useState(false);
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
 
   const questionCardRef = useRef<HTMLDivElement | null>(null);
   const questionCardInnerRef = useRef<HTMLDivElement | null>(null);
@@ -436,6 +525,56 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
   const perfumesBySlug = useMemo(() => new Map(perfumes.map((item) => [item.slug, item])), [perfumes]);
   const shownMatches = aiMatches && aiMatches.length ? aiMatches : topMatches;
+  const shouldShowResults = hasGeneratedAi && !isAiLoading;
+
+  const resultConfidence = useMemo(() => {
+    const filledChoiceCount = Object.values(answers).filter(Boolean).length;
+    const filledTextCount = Object.values(textAnswers).filter((value) => value.trim().length > 1).length;
+    const score = 72 + filledChoiceCount * 2.6 + filledTextCount * 4.2;
+    return Math.max(74, Math.min(98, Math.round(score)));
+  }, [answers, textAnswers]);
+
+  const profileLine = [
+    answers.vibe ? getChoiceLabel(dictionary.questions, "vibe", answers.vibe) : "",
+    answers.profile ? getChoiceLabel(dictionary.questions, "profile", answers.profile) : "",
+    answers.intensity ? getChoiceLabel(dictionary.questions, "intensity", answers.intensity) : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  const fitLine = [
+    answers.occasion ? getChoiceLabel(dictionary.questions, "occasion", answers.occasion) : "",
+    answers.season ? getChoiceLabel(dictionary.questions, "season", answers.season) : "",
+    answers.longevity ? getChoiceLabel(dictionary.questions, "longevity", answers.longevity) : "",
+  ]
+    .filter(Boolean)
+    .join(" • ");
+
+  const notesLine = textAnswers.favoriteNotes.trim()
+    ? textAnswers.favoriteNotes.trim()
+    : answers.profile
+      ? getChoiceLabel(dictionary.questions, "profile", answers.profile)
+      : "-";
+
+  const summaryChips = [
+    { label: dictionary.chipProfile, value: profileLine || "-" },
+    { label: dictionary.chipNotes, value: notesLine },
+    { label: dictionary.chipFit, value: fitLine || "-" },
+  ];
+
+  const resultTags = getResultTags(dictionary, answers);
+  const featuredMatch = shownMatches[0];
+  const secondaryMatches = shownMatches.slice(1);
+
+  const summaryPreview = useMemo(() => {
+    if (!aiSummary) return "";
+
+    if (aiSummary.length <= 160) {
+      return aiSummary;
+    }
+
+    return `${aiSummary.slice(0, 160).trimEnd()}...`;
+  }, [aiSummary]);
 
   const progress = Math.round((Math.min(stepIndex, totalSteps) / totalSteps) * 100);
   const currentAnswer = currentQuestion.kind === "choice" ? answers[currentQuestion.key] : textAnswers[currentQuestion.key];
@@ -460,7 +599,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
     setTextAnswers(INITIAL_TEXT_ANSWERS);
     setStepIndex(0);
     setAiMatches(null);
-    setAiFollowUps([]);
+    setAiSummary("");
     setAiError("");
     setAiNotice("");
     setHasGeneratedAi(false);
@@ -491,7 +630,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
       const payload = (await response.json().catch(() => ({}))) as {
         slugs?: string[];
-        followUpQuestions?: string[];
+        summary?: string;
         error?: string;
         usedFallback?: boolean;
       };
@@ -519,7 +658,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
       }
 
       setAiMatches(mapped.length ? mapped : null);
-      setAiFollowUps((payload.followUpQuestions ?? []).slice(0, 3));
+      setAiSummary((payload.summary ?? "").trim());
       setHasGeneratedAi(true);
     } catch {
       setAiError(dictionary.failed);
@@ -541,6 +680,29 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
     lastGeneratedRef.current = generationKey;
     void requestAiRecommendations();
   }, [generationKey, hasGeneratedAi, isAiLoading, isComplete]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 767px)");
+
+    const handleChange = () => {
+      const mobile = mediaQuery.matches;
+      setIsMobileLayout(mobile);
+      setIsSummaryExpanded(!mobile);
+    };
+
+    handleChange();
+    mediaQuery.addEventListener("change", handleChange);
+
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMobileLayout) {
+      setIsSummaryExpanded(true);
+    }
+  }, [isMobileLayout]);
 
   useLayoutEffect(() => {
     if (isComplete || !questionCardRef.current || !questionCardInnerRef.current) return;
@@ -569,8 +731,35 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
     };
   }, [currentQuestion, isComplete]);
 
+  const renderResultMeta = (perfume: Perfume, index: number, dense = false) => {
+    const tags = resultTags.length ? resultTags : [perfume.brand];
+    const profileLabel = answers.profile ? getChoiceLabel(dictionary.questions, "profile", answers.profile) : "";
+    const profileMatch =
+      answers.profile && answers.profile in KEYWORDS.profile
+        ? countMatches(collectPerfumeTokens(perfume), KEYWORDS.profile[answers.profile as keyof typeof KEYWORDS.profile])
+        : 0;
+    const reason = getReasonText(locale, profileMatch > 0 ? profileLabel : "", tags);
+
+    return (
+      <div className={dense ? "qoxunu-mobile-meta" : "qoxunu-desktop-meta"}>
+        <p className="inline-flex rounded-full border border-zinc-300/90 bg-[#f7f6f3] px-2.5 py-1 text-[0.62rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
+          {dictionary.rankedLabel} #{index + 1}
+        </p>
+        <p className="mt-2 text-[0.7rem] font-semibold tracking-[0.11em] text-zinc-500 uppercase">{dictionary.reasonLabel}</p>
+        <p className={dense ? "qoxunu-mobile-reason mt-1 text-[0.8rem] leading-5 text-zinc-700" : "mt-1 text-[0.8rem] leading-5 text-zinc-700"}>{reason}</p>
+        <div className="mt-2 flex flex-nowrap gap-1.5 overflow-x-auto pb-0.5">
+          {tags.slice(0, 3).map((tag) => (
+            <span key={`${perfume.id}-${tag}`} className="shrink-0 rounded-full border border-zinc-300/85 bg-[#f4f4f2] px-2 py-0.5 text-[0.62rem] font-medium text-zinc-600">
+              {tag}
+            </span>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <section className="mx-auto w-full max-w-6xl px-2 pb-6 pt-3 sm:px-3 sm:pt-4 lg:px-4">
+    <section className="mx-auto w-full max-w-6xl px-2 pb-24 pt-3 sm:px-3 sm:pb-6 sm:pt-4 lg:px-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{dictionary.eyebrow}</p>
         <h1 className="mt-2 text-3xl leading-tight text-zinc-900 sm:text-4xl">{dictionary.title}</h1>
@@ -669,62 +858,190 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           </div>
         </div>
       ) : (
-        <div className="quiz-results-enter mt-5">
-          <div className="quiz-results-hero relative overflow-hidden rounded-[1.5rem] px-4 py-5 sm:px-5">
+        <div className="quiz-results-enter mt-4">
+          <div className="quiz-results-hero relative overflow-hidden rounded-[1.35rem] px-3 py-4 sm:px-4 sm:py-4.5 lg:px-5 lg:py-5">
             <span aria-hidden="true" className="quiz-results-spark quiz-results-spark-main" />
             <span aria-hidden="true" className="quiz-results-spark quiz-results-spark-soft" />
-            <h2 className="text-3xl leading-tight text-zinc-900 md:text-4xl">{dictionary.resultTitle}</h2>
-            <p className="mt-3 max-w-3xl text-zinc-600">{dictionary.resultDescription}</p>
+            <div className="qoxunu-result-header grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
+              <div>
+                <h2 className="text-[1.7rem] leading-tight text-zinc-900 sm:text-[1.95rem] lg:text-[2.15rem]">{dictionary.resultTitle}</h2>
+                <p className="mt-1.5 max-w-3xl text-[0.88rem] leading-6 text-zinc-600 sm:text-[0.93rem]">{dictionary.resultDescription}</p>
+              </div>
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={onRestart}
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-300/90 bg-[#f6f5f2] px-6 text-sm font-semibold text-zinc-700 transition duration-300 md:hover:-translate-y-0.5 md:hover:bg-white"
-              >
-                {dictionary.restart}
-              </button>
-              <Link
-                href="/catalog"
-                className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-6 text-sm font-semibold text-[#fffdf8] shadow-[0_14px_30px_rgba(90,70,35,0.24)] transition duration-300 md:hover:-translate-y-0.5 md:hover:bg-[#5f4925]"
-              >
-                {dictionary.seeCatalog}
-              </Link>
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <p className="inline-flex rounded-full border border-zinc-700/20 bg-white/75 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
+                  {dictionary.resultConfidenceLabel}: {resultConfidence}%
+                </p>
+                <button
+                  type="button"
+                  onClick={onRestart}
+                  className="hidden min-h-9 items-center justify-center rounded-full border border-zinc-300/90 bg-[#f6f5f2] px-4 text-xs font-semibold text-zinc-700 transition duration-300 md:inline-flex md:hover:-translate-y-0.5 md:hover:bg-white"
+                >
+                  {dictionary.restart}
+                </button>
+                <Link
+                  href="/catalog"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-4 text-xs font-semibold text-[#fffdf8] shadow-[0_12px_24px_rgba(90,70,35,0.2)] transition duration-300 md:w-auto md:hover:-translate-y-0.5 md:hover:bg-[#5f4925]"
+                >
+                  {dictionary.seeCatalog}
+                </Link>
+              </div>
             </div>
           </div>
 
-          <div className="mt-4 rounded-[1.5rem] border border-zinc-200 bg-white px-4 py-4 sm:px-5 sm:py-5">
-            {isAiLoading ? <p className="text-sm text-zinc-600">{dictionary.generating}</p> : null}
+          {isMobileLayout ? (
+            <div className="mt-3 space-y-3">
+              {featuredMatch ? (
+                <section className="qoxunu-mobile-featured rounded-[1.35rem] border border-zinc-200 bg-white p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="inline-flex rounded-full border border-zinc-300/90 bg-[#f7f6f3] px-2.5 py-1 text-[0.62rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
+                      {dictionary.topPickLabel}
+                    </p>
+                    <span className="text-[0.62rem] font-semibold tracking-[0.11em] text-zinc-500 uppercase">{dictionary.resultConfidenceLabel} {resultConfidence}%</span>
+                  </div>
 
-            {aiFollowUps.length ? (
-              <div className="rounded-2xl bg-[#f7f7f6] px-4 py-3 ring-1 ring-zinc-200">
-                <p className="text-xs font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiQuestionsLabel}</p>
-                <ul className="mt-2 space-y-1.5 text-sm text-zinc-700">
-                  {aiFollowUps.map((item) => (
-                    <li key={item}>• {item}</li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
+                  <div className="mt-2">
+                    {renderResultMeta(featuredMatch, 0, true)}
+                  </div>
 
-            {aiNotice ? <p className="mt-3 text-sm text-amber-700">{aiNotice}</p> : null}
-            {aiError ? <p className="mt-3 text-sm text-rose-600">{aiError}</p> : null}
-          </div>
+                  <div className="mt-3 border-t border-zinc-200 pt-3">
+                    <ProductCard perfume={featuredMatch} locale={locale} />
+                  </div>
+                </section>
+              ) : null}
 
-          {shownMatches.length ? (
-            <div className="quiz-results-grid mt-7 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 xl:gap-5">
-              {shownMatches.map((perfume, index) => (
-                <div key={perfume.id} className="quiz-result-card-wrap" style={{ animationDelay: `${140 + index * 110}ms` }}>
-                  <ProductCard perfume={perfume} locale={locale} />
+              {secondaryMatches.length ? (
+                <section>
+                  <p className="mb-2 text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.otherPicksLabel}</p>
+                  <div className="qoxunu-mobile-carousel -mx-2 flex gap-3 overflow-x-auto px-2 pb-2 pr-5 snap-x snap-mandatory">
+                    {secondaryMatches.map((perfume, index) => (
+                      <div key={perfume.id} className="qoxunu-mobile-slide min-w-[82vw] max-w-[82vw] snap-center rounded-[1.25rem] border border-zinc-200 bg-white p-3">
+                        {renderResultMeta(perfume, index + 2, true)}
+                        <div className="mt-3 border-t border-zinc-200 pt-3">
+                          <ProductCard perfume={perfume} locale={locale} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              <section className="qoxunu-mobile-summary rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</p>
+                    <p className={isSummaryExpanded ? "mt-1 text-sm leading-6 text-zinc-700" : "qoxunu-summary-preview mt-1 text-sm leading-6 text-zinc-700"}>
+                      {isSummaryExpanded ? aiSummary : summaryPreview}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSummaryExpanded((value) => !value)}
+                    className="shrink-0 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 py-2 text-[0.65rem] font-semibold text-zinc-700"
+                  >
+                    {isSummaryExpanded ? dictionary.showLess : dictionary.showMore}
+                  </button>
                 </div>
-              ))}
+
+                {isSummaryExpanded ? (
+                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    {summaryChips.map((chip) => (
+                      <div key={chip.label} className="qoxunu-summary-chip min-w-[72%] shrink-0 rounded-xl border border-zinc-200/80 bg-[#fafaf8] px-3 py-2">
+                        <p className="text-[0.62rem] font-semibold tracking-[0.12em] text-zinc-500 uppercase">{chip.label}</p>
+                        <p className="mt-1 text-[0.8rem] leading-5 text-zinc-700">{chip.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
             </div>
           ) : (
-            <div className="quiz-results-empty mt-6 px-2 py-4 text-zinc-500">
-              <p className="text-xl font-semibold text-zinc-700">{dictionary.noMatchTitle}</p>
-              <p className="mt-2">{dictionary.noMatchDescription}</p>
-            </div>
+            <>
+              <div className="mt-2.5 rounded-[1.35rem] border border-zinc-200 bg-white px-3 py-3 sm:px-4 sm:py-4">
+                {isAiLoading ? (
+                  <div>
+                    <p className="text-sm font-medium text-zinc-700">{dictionary.generating}</p>
+                    <p className="mt-0.5 text-xs text-zinc-500">{dictionary.generatingHint}</p>
+                    <div className="mt-2.5 grid gap-2 sm:grid-cols-3">
+                      <div className="quiz-loading-chip h-14 rounded-xl" />
+                      <div className="quiz-loading-chip h-14 rounded-xl" />
+                      <div className="quiz-loading-chip h-14 rounded-xl" />
+                    </div>
+                  </div>
+                ) : null}
+
+                {aiSummary && shouldShowResults ? (
+                  <details open className="qoxunu-summary-shell mt-1 rounded-2xl border border-zinc-200 bg-[#f7f7f6] px-3 py-3">
+                    <summary className="qoxunu-summary-summary cursor-pointer list-none">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</p>
+                          <p className="mt-1 text-sm leading-6 text-zinc-700 sm:text-[0.92rem]">{aiSummary}</p>
+                        </div>
+                        <span className="hidden rounded-full border border-zinc-300 bg-white px-2.5 py-1 text-[0.65rem] font-semibold text-zinc-600 uppercase sm:inline-flex">
+                          Details
+                        </span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-3">
+                      {summaryChips.map((chip) => (
+                        <div key={chip.label} className="qoxunu-summary-chip rounded-xl border border-zinc-200/80 bg-white/90 px-3 py-2">
+                          <p className="text-[0.62rem] font-semibold tracking-[0.12em] text-zinc-500 uppercase">{chip.label}</p>
+                          <p className="mt-1 text-[0.8rem] leading-5 text-zinc-700">{chip.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
+
+                {aiNotice ? <p className="mt-2.5 text-xs text-amber-700">{aiNotice}</p> : null}
+                {aiError ? <p className="mt-2.5 text-xs text-rose-600">{aiError}</p> : null}
+              </div>
+
+              {isAiLoading ? (
+                <div className="quiz-results-grid mt-5 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 xl:gap-5">
+                  {Array.from({ length: 3 }).map((_, index) => (
+                    <div key={`loading-${index}`} className="quiz-loading-card rounded-[1.3rem] border border-zinc-200 bg-white p-3 sm:p-4">
+                      <div className="quiz-loading-chip h-5 w-16 rounded-full" />
+                      <div className="quiz-loading-chip mt-3 h-56 rounded-2xl" />
+                      <div className="quiz-loading-chip mt-3 h-4 rounded-lg" />
+                      <div className="quiz-loading-chip mt-2 h-3 w-3/4 rounded-lg" />
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+
+              {shouldShowResults ? (
+                shownMatches.length ? (
+                  <div className="quiz-results-grid mt-4 grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-3 xl:gap-4">
+                    {shownMatches.map((perfume, index) => (
+                      <div key={perfume.id} className="quiz-result-card-wrap rounded-[1.2rem] border border-zinc-200 bg-white px-2.5 py-2.5 sm:px-3 sm:py-3" style={{ animationDelay: `${110 + index * 90}ms` }}>
+                        {renderResultMeta(perfume, index, false)}
+                        <div className="mt-2.5 border-t border-zinc-200 pt-2.5">
+                          <ProductCard perfume={perfume} locale={locale} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="quiz-results-empty mt-4 rounded-[1.2rem] border border-zinc-200 bg-white px-3 py-3 text-zinc-500">
+                    <p className="text-lg font-semibold text-zinc-700">{dictionary.noMatchTitle}</p>
+                    <p className="mt-1.5 text-sm leading-6">{dictionary.noMatchDescription}</p>
+                  </div>
+                )
+              ) : null}
+            </>
           )}
+
+          <div className="qoxunu-sticky-cta md:hidden">
+            <Link
+              href="/catalog"
+              className="qoxunu-sticky-cta-button inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-5 text-sm font-semibold text-[#fffdf8] shadow-[0_14px_28px_rgba(90,70,35,0.22)]"
+            >
+              {dictionary.seeCatalog}
+            </Link>
+          </div>
         </div>
       )}
     </section>
