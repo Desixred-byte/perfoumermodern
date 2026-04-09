@@ -23,10 +23,9 @@ export const metadata: Metadata = {
     "Perfoumer-də orijinal və uzunömürlü kişi və qadın ətirlərini kəşf edin. Lüks, niş və dizayner brendləri, sürətli çatdırılma və xüsusi kolleksiyalar - hamısı bir onlayn ətir mağazasında.",
   icons: {
     icon: [
-      { url: "/favicon.ico", type: "image/x-icon" },
-      { url: "/icon.png", type: "image/png", sizes: "512x512" },
+      { url: "/icon.png?v=2", type: "image/png", sizes: "512x512" },
     ],
-    shortcut: "/favicon.ico",
+    shortcut: "/icon.png?v=2",
     apple: [
       { url: "/apple-touch-icon.png", type: "image/png", sizes: "180x180" },
     ],
@@ -38,7 +37,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "https://images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless&width=1404&height=787",
+        url: "https://images-ext-1.discordapp.net/external/g7qTDmUIhF7j3Iftcx98k9JnLkOEjFWRqQIyV4iT6CI/%3Fformat%3Dwebp%26quality%3Dlossless%26width%3D1404%26height%3D787/https/images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless",
         width: 1404,
         height: 787,
         alt: "Perfoumer",
@@ -51,7 +50,7 @@ export const metadata: Metadata = {
     description:
       "Perfoumer-də orijinal və uzunömürlü kişi və qadın ətirlərini kəşf edin. Lüks, niş və dizayner brendləri, sürətli çatdırılma və xüsusi kolleksiyalar - hamısı bir onlayn ətir mağazasında.",
     images: [
-      "https://images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless&width=1404&height=787",
+      "https://images-ext-1.discordapp.net/external/g7qTDmUIhF7j3Iftcx98k9JnLkOEjFWRqQIyV4iT6CI/%3Fformat%3Dwebp%26quality%3Dlossless%26width%3D1404%26height%3D787/https/images-ext-1.discordapp.net/external/56LRNc2XGElyxjUEbRHDFuJJemiVwFe4EFREJU718Bk/https/framerusercontent.com/images/XG0jkQuFqFc9mFYgLTyUHvBGMeA.png?format=webp&quality=lossless",
     ],
   },
 };

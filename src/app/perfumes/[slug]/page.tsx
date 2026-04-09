@@ -160,7 +160,7 @@ export default async function PerfumeDetailPage({
               <div className="grid gap-3 sm:grid-cols-2">
                 <Link
                   href="#detail-sections"
-                  className="inline-flex min-h-13 items-center justify-center rounded-full border border-zinc-400 bg-transparent px-6 text-lg font-medium text-zinc-700 transition hover:bg-white/70"
+                  className="detail-cta detail-cta-secondary inline-flex min-h-13 items-center justify-center rounded-full border border-zinc-400 bg-transparent px-6 text-lg font-medium text-zinc-700"
                 >
                   {t.detail.more}
                 </Link>
@@ -169,7 +169,7 @@ export default async function PerfumeDetailPage({
                   href={whatsappLink}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex min-h-13 items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white transition hover:bg-[#262524]"
+                  className="detail-cta detail-cta-primary inline-flex min-h-13 items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white"
                 >
                   {t.detail.order}
                 </a>
