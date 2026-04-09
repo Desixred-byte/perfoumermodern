@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   Check,
   MagnifyingGlass,
@@ -166,6 +167,7 @@ export function CatalogClient({
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFiltersPanelOpen, setIsFiltersPanelOpen] = useState(false);
+  const [isPortalReady, setIsPortalReady] = useState(false);
   const deferredQuery = useDeferredValue(query);
   const refreshTimerRef = useRef<number | null>(null);
 
@@ -334,6 +336,10 @@ export function CatalogClient({
         window.clearTimeout(refreshTimerRef.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    setIsPortalReady(true);
   }, []);
 
   useEffect(() => {
@@ -604,39 +610,51 @@ export function CatalogClient({
         </div>
       ) : null}
 
-      <div
-        className={[
-          "fixed inset-0 z-50 transition-opacity duration-300",
-          isFiltersPanelOpen ? "pointer-events-auto opacity-100" : "pointer-events-none opacity-0",
-        ].join(" ")}
-        aria-hidden={!isFiltersPanelOpen}
-      >
-        <button
-          type="button"
-          aria-label={t.catalog.close}
-          onClick={() => setIsFiltersPanelOpen(false)}
-          className={[
-            "absolute inset-0 bg-zinc-950/20 backdrop-blur-[2px] transition-opacity duration-300",
-            isFiltersPanelOpen ? "opacity-100" : "opacity-0",
-          ].join(" ")}
-          tabIndex={isFiltersPanelOpen ? 0 : -1}
-        />
+      {isPortalReady
+        ? createPortal(
+            <div
+              className={[
+                "fixed inset-0 z-[90] transition-opacity duration-500",
+                isFiltersPanelOpen
+                  ? "pointer-events-auto opacity-100"
+                  : "pointer-events-none opacity-0",
+              ].join(" ")}
+              aria-hidden={!isFiltersPanelOpen}
+            >
+              <div
+                aria-hidden="true"
+                className={[
+                  "absolute inset-0 z-0 transition-all duration-500",
+                  isFiltersPanelOpen
+                    ? "bg-zinc-950/28 opacity-100 backdrop-blur-[3px]"
+                    : "bg-zinc-950/0 opacity-0 backdrop-blur-0",
+                ].join(" ")}
+              />
 
-        <div
-          className={[
-            "absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-3 pb-3 sm:px-6 sm:pb-6",
-            "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
-            isFiltersPanelOpen ? "translate-y-0" : "translate-y-6",
-          ].join(" ")}
-        >
-          <aside
-            id="catalog-advanced-filters"
-            role="dialog"
-            aria-modal="true"
-            aria-label={t.catalog.filters}
-            className="overflow-hidden rounded-[2rem] border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,247,0.92)_100%)] shadow-[0_-24px_70px_rgba(15,15,15,0.18)] backdrop-blur-xl"
-          >
-            <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-zinc-200/80" />
+              <div
+                className="absolute inset-0 z-10 flex items-end justify-center px-3 pb-3 sm:px-6 sm:pb-6 lg:items-center lg:p-6"
+                onPointerDown={(event) => {
+                  if (event.target === event.currentTarget) {
+                    setIsFiltersPanelOpen(false);
+                  }
+                }}
+              >
+                <aside
+                  id="catalog-advanced-filters"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label={t.catalog.filters}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  className={[
+                    "flex max-h-[calc(100vh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,247,0.92)_100%)] backdrop-blur-xl lg:max-h-[calc(100vh-3rem)]",
+                    "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+                    "shadow-[0_-24px_70px_rgba(15,15,15,0.18)] lg:shadow-[0_26px_70px_rgba(15,15,15,0.2)]",
+                    isFiltersPanelOpen
+                      ? "translate-y-0 scale-100 opacity-100"
+                      : "translate-y-10 scale-[0.995] opacity-0 lg:translate-y-4 lg:scale-[0.972]",
+                  ].join(" ")}
+                >
+            <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-zinc-200/80 lg:hidden" />
 
             <div className="flex items-start justify-between gap-4 border-b border-zinc-200/70 px-5 pb-4 pt-4 sm:px-6">
               <div>
@@ -671,7 +689,7 @@ export function CatalogClient({
               </div>
             </div>
 
-            <div className="max-h-[min(78vh,42rem)] overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
                 <SectionShell title={t.catalog.brand} description={t.catalog.allBrands}>
                   <OptionCluster
@@ -757,9 +775,12 @@ export function CatalogClient({
                 </div>
               </div>
             </div>
-          </aside>
-        </div>
-      </div>
+                </aside>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

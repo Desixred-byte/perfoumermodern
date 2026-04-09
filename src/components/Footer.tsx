@@ -51,9 +51,9 @@ export function Footer({ locale }: FooterProps) {
   }, []);
 
   const wordmarkStyle = {
-    transform: `translate3d(0, ${(1 - progress) * 82}px, 0) scale(${0.9 + progress * 0.14})`,
+    transform: `translate3d(0, ${(1 - progress) * 46}px, 0)`,
     opacity: 0.2 + progress * 0.8,
-    letterSpacing: `${-0.05 + progress * 0.03}em`,
+    letterSpacing: `${-0.022 + progress * 0.012}em`,
   };
 
   return (
@@ -119,7 +119,7 @@ export function Footer({ locale }: FooterProps) {
             </div>
           </div>
 
-          <div className="mt-10 border-t border-zinc-200/65 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(248,248,246,0.72)_100%)] px-6 pt-4 md:mt-12 md:px-10 xl:px-12">
+          <div className="mt-10 border-t border-zinc-200/65 bg-[linear-gradient(180deg,rgba(255,255,255,0)_0%,rgba(248,248,246,0.72)_100%)] px-6 pt-4 pb-3 md:mt-12 md:px-10 md:pb-4 xl:px-12">
             <p className="footer-wordmark footer-wordmark-animated select-none text-zinc-800 will-change-transform" style={wordmarkStyle}>
               PERFOUMER
             </p>

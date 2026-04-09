@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { ArrowRight } from "@phosphor-icons/react";
 import { getDictionary, locales, type Locale } from "@/lib/i18n";
 
@@ -52,6 +52,24 @@ export function Header({ floating = false, locale }: HeaderProps) {
     router.refresh();
   };
 
+  const handleLogoMouseMove = (event: MouseEvent<HTMLSpanElement>) => {
+    const target = event.currentTarget;
+    const rect = target.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+
+    const rotateY = (x - 0.5) * 14;
+    const rotateX = (0.5 - y) * 14;
+
+    target.style.setProperty("--logo-rx", `${rotateX.toFixed(2)}deg`);
+    target.style.setProperty("--logo-ry", `${rotateY.toFixed(2)}deg`);
+  };
+
+  const handleLogoMouseLeave = (event: MouseEvent<HTMLSpanElement>) => {
+    event.currentTarget.style.setProperty("--logo-rx", "0deg");
+    event.currentTarget.style.setProperty("--logo-ry", "0deg");
+  };
+
   return (
     <>
       <header
@@ -66,13 +84,17 @@ export function Header({ floating = false, locale }: HeaderProps) {
             className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
             onClick={() => setIsMenuOpen(false)}
           >
-            <span className="grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9">
+            <span
+              className="header-logo-orb grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9"
+              onMouseMove={handleLogoMouseMove}
+              onMouseLeave={handleLogoMouseLeave}
+            >
               <Image
                 src="/logo.webp"
                 alt="Perfoumer"
                 width={28}
                 height={28}
-                className="h-6 w-6 object-contain sm:h-8 sm:w-8"
+                className="header-logo-image h-6 w-6 object-contain sm:h-8 sm:w-8"
                 priority
               />
             </span>
@@ -153,13 +175,17 @@ export function Header({ floating = false, locale }: HeaderProps) {
               className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
               onClick={() => setIsMenuOpen(false)}
             >
-              <span className="grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9">
+              <span
+                className="header-logo-orb grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9"
+                onMouseMove={handleLogoMouseMove}
+                onMouseLeave={handleLogoMouseLeave}
+              >
                 <Image
                   src="/logo.webp"
                   alt="Perfoumer"
                   width={28}
                   height={28}
-                  className="h-6 w-6 object-contain sm:h-8 sm:w-8"
+                  className="header-logo-image h-6 w-6 object-contain sm:h-8 sm:w-8"
                 />
               </span>
               <span className="flex flex-col leading-none">

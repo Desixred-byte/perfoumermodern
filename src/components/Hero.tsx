@@ -1,84 +1,36 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef } from "react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";
 
 type HeroProps = {
-  backgroundImage: string;
   locale: Locale;
 };
-
-export function Hero({ backgroundImage, locale }: HeroProps) {
-  const backgroundRef = useRef<HTMLDivElement | null>(null);
+export function Hero({ locale }: HeroProps) {
   const t = getDictionary(locale);
-
-  useEffect(() => {
-    let raf = 0;
-    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    const updateParallax = () => {
-      raf = 0;
-      const element = backgroundRef.current;
-      if (!element) return;
-
-      if (reduceMotion) {
-        element.style.transform = "translate3d(0, 0, 0) scale(1)";
-        return;
-      }
-
-      const section = element.parentElement;
-      if (!section) return;
-
-      const rect = section.getBoundingClientRect();
-      const viewportHeight = window.innerHeight;
-      const progress = Math.min(Math.max((viewportHeight - rect.top) / (viewportHeight + rect.height), 0), 1);
-      const offset = Math.round((progress - 0.5) * 18);
-
-      element.style.transform = `translate3d(0, ${offset}px, 0) scale(1)`;
-    };
-
-    const handleScroll = () => {
-      if (raf) return;
-      raf = window.requestAnimationFrame(updateParallax);
-    };
-
-    updateParallax();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll);
-
-    return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
-      if (raf) {
-        window.cancelAnimationFrame(raf);
-      }
-    };
-  }, []);
 
   return (
     <section className="hero-shell relative overflow-hidden rounded-[34px] xl:rounded-[42px]">
       <div
-        ref={backgroundRef}
-        className="absolute inset-0 bg-cover bg-center will-change-transform"
+        className="absolute inset-0"
         style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundPosition: "center 68%",
-          transform: "translate3d(0, 0, 0) scale(1)",
+          background:
+            "linear-gradient(126deg, #111214 0%, #191a1f 36%, #2a2320 68%, #3a2a24 100%)",
         }}
       />
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-zinc-900/55 via-zinc-900/30 to-zinc-900/10" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_80%,rgba(214,255,190,0.33),transparent_35%)]" />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-[56%] bg-gradient-to-r from-[#dcebe5]/52 via-[#dcebe5]/22 to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 left-0 w-[42%] bg-gradient-to-r from-white/18 via-white/8 to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[24%] bg-gradient-to-l from-[#d7edf8]/24 via-[#d7edf8]/10 to-transparent xl:block" />
-      <div className="pointer-events-none absolute -left-20 bottom-[-22%] h-[78%] w-[45%] rounded-full bg-[#d8efad]/45 blur-3xl" />
-      <div className="pointer-events-none absolute -left-16 top-[6%] hidden h-36 w-36 rounded-full bg-white/45 blur-3xl xl:block" />
-      <div className="pointer-events-none absolute -right-16 top-[8%] hidden h-40 w-40 rounded-full bg-white/34 blur-3xl xl:block" />
-      <div className="pointer-events-none absolute -right-12 bottom-[12%] hidden h-44 w-44 rounded-full bg-[#d6eef7]/28 blur-3xl xl:block" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_78%,rgba(244,209,176,0.36),transparent_36%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_76%_22%,rgba(214,227,255,0.22),transparent_44%)]" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-[58%] bg-gradient-to-r from-white/24 via-white/8 to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-[30%] bg-gradient-to-l from-[#c5d0eb]/18 via-[#c5d0eb]/8 to-transparent xl:block" />
+      <div className="hero-grain pointer-events-none absolute inset-0 opacity-[0.16]" />
 
-      <div className="relative z-[1] mx-auto flex h-full max-w-[1540px] items-start px-6 py-16 text-white md:px-10 md:py-20 xl:py-24">
+      <div className="hero-aura-float pointer-events-none absolute -left-16 bottom-[-16%] h-[64%] w-[42%] rounded-full bg-[#f7d2af]/48 blur-3xl" />
+      <div className="hero-aura-float-delayed pointer-events-none absolute left-[42%] top-[4%] hidden h-36 w-36 rounded-full bg-[#fff3e4]/42 blur-3xl xl:block" />
+      <div className="hero-aura-float pointer-events-none absolute -right-16 top-[10%] hidden h-44 w-44 rounded-full bg-[#d3def3]/30 blur-3xl xl:block" />
+      <div className="hero-aura-float-delayed pointer-events-none absolute right-[14%] bottom-[8%] hidden h-48 w-48 rounded-full bg-[#f2cab2]/24 blur-3xl xl:block" />
+
+      <div className="relative z-[3] mx-auto flex h-full max-w-[1540px] items-start px-6 py-16 text-white md:px-10 md:py-20 xl:py-24">
         <div className="max-w-[46rem] pt-28 md:pt-32 xl:max-w-[50rem] xl:pt-36">
           <p className="hero-fade-up hero-delay-1 mb-3 text-sm tracking-[0.2em] text-white/80 uppercase">
             {t.hero.eyebrow}

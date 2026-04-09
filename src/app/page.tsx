@@ -20,10 +20,7 @@ export default async function Home() {
   return (
     <div className="bg-[#f3f3f2]">
       <div className="mx-auto max-w-[1540px] px-4 pt-2 pb-4 sm:px-6 sm:pt-3 sm:pb-5 md:px-10 md:pt-4 md:pb-6 xl:max-w-none xl:px-6 xl:pt-4 xl:pb-6">
-        <Hero
-          locale={locale}
-          backgroundImage="https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=1800&auto=format&fit=crop"
-        />
+        <Hero locale={locale} />
       </div>
 
       <main id="products" className="mx-auto mt-10 max-w-[1540px] px-6 md:px-10">
