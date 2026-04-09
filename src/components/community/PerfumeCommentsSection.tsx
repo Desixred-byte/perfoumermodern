@@ -240,23 +240,26 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
       const withUsernameSelect = "id,user_id,username,user_email,perfume_slug,rating,comment,created_at";
       const fallbackSelect = "id,user_id,user_email,perfume_slug,rating,comment,created_at";
 
-      let query = await supabase
+      const primaryQuery = await supabase
         .from("comments")
         .select(withUsernameSelect)
         .eq("perfume_slug", perfumeSlug)
         .order("created_at", { ascending: false });
 
-      if (query.error?.message.toLowerCase().includes("username")) {
-        query = await supabase
+      let rows: unknown[] = (primaryQuery.data as unknown[] | null) ?? [];
+
+      if (primaryQuery.error?.message.toLowerCase().includes("username")) {
+        const fallbackQuery = await supabase
           .from("comments")
           .select(fallbackSelect)
           .eq("perfume_slug", perfumeSlug)
           .order("created_at", { ascending: false });
+        rows = (fallbackQuery.data as unknown[] | null) ?? [];
       }
 
       if (!isMounted) return;
 
-      setComments(normalizeCommentRows((query.data as unknown[] | null) ?? []));
+      setComments(normalizeCommentRows(rows));
       setIsLoading(false);
     };
 
@@ -386,21 +389,24 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
 
     const withUsernameSelect = "id,user_id,username,user_email,perfume_slug,rating,comment,created_at";
     const fallbackSelect = "id,user_id,user_email,perfume_slug,rating,comment,created_at";
-    let refreshQuery = await supabase
+    const primaryRefreshQuery = await supabase
       .from("comments")
       .select(withUsernameSelect)
       .eq("perfume_slug", perfumeSlug)
       .order("created_at", { ascending: false });
 
-    if (refreshQuery.error?.message.toLowerCase().includes("username")) {
-      refreshQuery = await supabase
+    let refreshedRows: unknown[] = (primaryRefreshQuery.data as unknown[] | null) ?? [];
+
+    if (primaryRefreshQuery.error?.message.toLowerCase().includes("username")) {
+      const fallbackRefreshQuery = await supabase
         .from("comments")
         .select(fallbackSelect)
         .eq("perfume_slug", perfumeSlug)
         .order("created_at", { ascending: false });
+      refreshedRows = (fallbackRefreshQuery.data as unknown[] | null) ?? [];
     }
 
-    setComments(normalizeCommentRows((refreshQuery.data as unknown[] | null) ?? []));
+    setComments(normalizeCommentRows(refreshedRows));
     setCommentText("");
     setRating(5);
     setLastSubmittedAt(Date.now());
