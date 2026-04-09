@@ -381,3 +381,54 @@ h6 {
     background-position: -40% 0;
   }
 }
+
+.route-preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 50% -16%, rgba(255, 255, 255, 0.5) 0%, rgba(243, 243, 242, 0.25) 38%, rgba(243, 243, 242, 0) 72%),
+    linear-gradient(180deg, rgba(243, 243, 242, 0.72) 0%, rgba(243, 243, 242, 0) 22%);
+  backdrop-filter: blur(0.8px);
+  -webkit-backdrop-filter: blur(0.8px);
+  transition: opacity 180ms ease;
+}
+
+.route-preloader[data-visible="true"] {
+  opacity: 1;
+}
+
+.route-preloader-bar {
+  height: 3px;
+  width: 100%;
+  background: linear-gradient(90deg, rgba(39, 39, 42, 0.02) 0%, rgba(39, 39, 42, 0.95) 48%, rgba(39, 39, 42, 0.02) 100%);
+  transform-origin: left;
+  animation: routePreloaderSweep 900ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes routePreloaderSweep {
+  0% {
+    transform: scaleX(0.08);
+    opacity: 0.3;
+  }
+  55% {
+    transform: scaleX(0.88);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scaleX(0.16);
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-preloader {
+    transition: none;
+  }
+
+  .route-preloader-bar {
+    animation: none;
+  }
+}

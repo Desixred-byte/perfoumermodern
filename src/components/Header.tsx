@@ -63,7 +63,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
         <div className="mx-auto mt-1 flex max-w-[1540px] items-center justify-between px-3 py-3 sm:px-6 sm:py-6 md:px-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-[1.45rem] tracking-tight text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2 sm:text-3xl"
+            className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
             onClick={() => setIsMenuOpen(false)}
           >
             <span className="grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9">
@@ -76,7 +76,14 @@ export function Header({ floating = false, locale }: HeaderProps) {
                 priority
               />
             </span>
-            <span className="brand-wordmark">Perfoumer</span>
+            <span className="flex flex-col leading-none">
+              <span className="brand-wordmark text-[1.45rem] tracking-tight sm:text-3xl">
+                Perfoumer
+              </span>
+              <span className="mt-0.5 text-[0.58rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase sm:text-[0.62rem]">
+                {t.header.tagline}
+              </span>
+            </span>
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
             <div className="hidden items-center rounded-full bg-white/92 p-1 shadow-sm ring-1 ring-zinc-200/80 md:flex">
@@ -143,7 +150,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
           <div className="sticky top-0 z-10 mt-1 flex items-center justify-between py-4 sm:py-6">
             <Link
               href="/"
-              className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-[1.45rem] tracking-tight text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2 sm:text-3xl"
+              className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
               onClick={() => setIsMenuOpen(false)}
             >
               <span className="grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9">
@@ -155,7 +162,14 @@ export function Header({ floating = false, locale }: HeaderProps) {
                   className="h-6 w-6 object-contain sm:h-8 sm:w-8"
                 />
               </span>
-              <span className="brand-wordmark">Perfoumer</span>
+              <span className="flex flex-col leading-none">
+                <span className="brand-wordmark text-[1.45rem] tracking-tight sm:text-3xl">
+                  Perfoumer
+                </span>
+                <span className="mt-0.5 text-[0.58rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase sm:text-[0.62rem]">
+                  {t.header.tagline}
+                </span>
+              </span>
             </Link>
 
             <div className="hidden items-center gap-2 sm:gap-3 md:flex">

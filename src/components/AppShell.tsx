@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useLayoutEffect } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 
 import { Header } from "@/components/Header";
 import { ScrollRestoreOnNavigation } from "@/components/ScrollRestoreOnNavigation";
@@ -15,6 +15,19 @@ type AppShellProps = {
 export function AppShell({ children, locale }: AppShellProps) {
   const pathname = usePathname();
   const isHomePage = pathname === "/";
+  const [isRouteLoading, setIsRouteLoading] = useState(true);
+
+  useEffect(() => {
+    setIsRouteLoading(true);
+
+    const timer = window.setTimeout(() => {
+      setIsRouteLoading(false);
+    }, 320);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [pathname]);
 
   useLayoutEffect(() => {
     if (typeof window === "undefined") {
@@ -38,6 +51,13 @@ export function AppShell({ children, locale }: AppShellProps) {
 
   return (
     <>
+      <div
+        aria-hidden="true"
+        className="route-preloader"
+        data-visible={isRouteLoading ? "true" : "false"}
+      >
+        <div className="route-preloader-bar" />
+      </div>
       <ScrollRestoreOnNavigation />
       <Header floating locale={locale} />
       <div
