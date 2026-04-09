@@ -10,9 +10,12 @@ import { NoteGroup } from "@/components/NoteGroup";
 import { ProductInfoModalButton } from "@/components/ProductInfoModalButton";
 import { ProductCard } from "@/components/ProductCard";
 import { ScrollToTopOnMount } from "@/components/ScrollToTopOnMount";
+import { PerfumeCommentsSection } from "@/components/community/PerfumeCommentsSection";
+import { PerfumeWishlistButton } from "@/components/community/PerfumeWishlistButton";
 import { getPerfumeBySlug, getPerfumes, getRelatedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
+import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
 
 type PerfumeDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -27,6 +30,7 @@ export default async function PerfumeDetailPage({
   params,
 }: PerfumeDetailPageProps) {
   const whatsappLink = "https://wa.me/994507078070";
+  const supabaseConfig = getSupabasePublicConfigFromServer();
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const { slug } = await params;
@@ -88,9 +92,17 @@ export default async function PerfumeDetailPage({
               </Link>
             </p>
 
-            <h1 className="mt-2 max-w-3xl text-[3.8rem] leading-[0.94] tracking-[-0.04em] text-zinc-800 md:text-[5.15rem]">
-              {perfume.name}
-            </h1>
+            <div className="mt-2 flex flex-wrap items-start justify-between gap-4">
+              <h1 className="max-w-3xl text-[3.8rem] leading-[0.94] tracking-[-0.04em] text-zinc-800 md:text-[5.15rem]">
+                {perfume.name}
+              </h1>
+
+              <PerfumeWishlistButton
+                perfumeSlug={perfume.slug}
+                locale={locale}
+                supabase={supabaseConfig}
+              />
+            </div>
 
             <p className="mt-3 flex items-center gap-2 text-lg text-zinc-500">
               <User size={18} weight="fill" className="text-zinc-500" />
@@ -182,7 +194,13 @@ export default async function PerfumeDetailPage({
           </div>
         </div>
 
-        <section className="mt-20">
+        <PerfumeCommentsSection
+          perfumeSlug={perfume.slug}
+          locale={locale}
+          supabase={supabaseConfig}
+        />
+
+        <section className="mt-24">
           <h2 className="text-5xl leading-[0.98] text-zinc-800 md:text-6xl">
             {t.detail.moreProducts}
           </h2>

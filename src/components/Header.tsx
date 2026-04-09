@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
-import { useEffect, useState, type MouseEvent } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { ArrowRight } from "@phosphor-icons/react";
+import type { Session } from "@supabase/supabase-js";
 import { getDictionary, locales, type Locale } from "@/lib/i18n";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 
 type HeaderProps = {
   floating?: boolean;
@@ -14,16 +16,41 @@ type HeaderProps = {
 
 export function Header({ floating = false, locale }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const t = getDictionary(locale);
+  const supabase = getSupabaseBrowserClient();
+  const copy = {
+    az: {
+      login: "Giriş",
+      account: "Hesabım",
+      wishlist: "İstək siyahısı",
+    },
+    en: {
+      login: "Login",
+      account: "My Account",
+      wishlist: "Wishlist",
+    },
+    ru: {
+      login: "Вход",
+      account: "Мой аккаунт",
+      wishlist: "Wishlist",
+    },
+  } as const;
   const menuItems = [
     { href: "/", label: t.header.home },
     { href: "/#about", label: t.header.about },
     { href: "/catalog", label: t.header.products },
+    ...(session ? [{ href: "/wishlist", label: copy[locale].wishlist }] : []),
     { href: "/qoxunu", label: t.header.scentQuiz },
     { href: "/brands", label: t.header.brands },
     { href: "/#contact", label: t.header.contact },
   ];
+  const loginHref = useMemo(() => {
+    const nextPath = pathname || "/";
+    return `/login?next=${encodeURIComponent(nextPath)}`;
+  }, [pathname]);
 
   useEffect(() => {
     if (isMenuOpen) {
@@ -38,17 +65,45 @@ export function Header({ floating = false, locale }: HeaderProps) {
     };
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    if (!supabase || !isSupabaseConfigured()) {
+      return;
+    }
+
+    let isMounted = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) return;
+      setSession(data.session ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!isMounted) return;
+      setSession(nextSession);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
   const menuTransition =
     "transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const stickTransition =
     "absolute left-1/2 top-1/2 block h-0.5 w-4 -translate-x-1/2 rounded-full bg-zinc-800 opacity-100 transition-transform duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]";
 
-  const updateLocale = (nextLocale: Locale) => {
+  const updateLocale = async (nextLocale: Locale) => {
     if (nextLocale === locale) {
       return;
     }
 
-    document.cookie = `perfoumer-locale=${nextLocale}; path=/; max-age=31536000; samesite=lax`;
+    await fetch("/api/locale", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ locale: nextLocale }),
+    });
     setIsMenuOpen(false);
     router.refresh();
   };
@@ -222,6 +277,26 @@ export function Header({ floating = false, locale }: HeaderProps) {
                   />
                 </Link>
               ))}
+
+              <Link
+                href={session ? "/account" : loginHref}
+                onClick={() => setIsMenuOpen(false)}
+                className={[
+                  "group mt-3 flex w-full items-center gap-4 py-2 text-[1.95rem] leading-[1.08] font-medium text-zinc-700 sm:text-[3rem] md:py-2.5 md:text-[3.55rem]",
+                  menuTransition,
+                  isMenuOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
+                ].join(" ")}
+              >
+                <span>{session ? copy[locale].account : copy[locale].login}</span>
+                <span className="relative h-px min-w-0 flex-1 overflow-hidden bg-zinc-300/70">
+                  <span className="absolute inset-y-0 left-0 w-full origin-left scale-x-0 bg-zinc-500/80 transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                </span>
+                <ArrowRight
+                  size={30}
+                  weight="light"
+                  className="shrink-0 translate-x-[-8px] text-zinc-500 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+                />
+              </Link>
             </nav>
           </div>
         </div>

@@ -1,6 +1,5 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
-import { cache } from "react";
 
 import { parseCsv } from "@/lib/csv";
 import type { Note, Perfume, PerfumeSize, PerfumeWithNotes } from "@/types/catalog";
@@ -38,6 +37,16 @@ const splitByComma = (value: string) =>
 
 const stripHtml = (value: string) =>
   value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+const normalizeNoteLookupKey = (value: string) =>
+  value
+    .toLowerCase()
+    .trim()
+    .replace(/[^\p{L}\p{N}\s-]/gu, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-+/, "")
+    .replace(/-+$/, "");
 
 const parsePrice = (value: string): number | null => {
   if (!value?.trim()) return null;
@@ -86,6 +95,8 @@ const fallbackNote = (slug: string): Note => ({
 const NOTES_CSV_PATH = path.join(process.cwd(), "data", "Notes.csv");
 const NOTES_CSV_FALLBACK_PATH = path.join(process.cwd(), "data", "notes.csv");
 const PERFUMES_CSV_PATH = path.join(process.cwd(), "data", "perfumes.csv");
+const ADMIN_NOTES_JSON_PATH = path.join(process.cwd(), "data", "admin", "notes.json");
+const ADMIN_PERFUMES_JSON_PATH = path.join(process.cwd(), "data", "admin", "perfumes.json");
 
 const PERFUME_CDN_BASE_URL = "https://perfoumer-cdn.vercel.app/perfumes";
 
@@ -113,7 +124,142 @@ const rotateBySeed = <T,>(items: T[], seed: string) => {
 
 const getDailySeed = () => new Date().toISOString().slice(0, 10);
 
-export const getNotes = cache(async (): Promise<Note[]> => {
+async function readJsonSafely<T>(filePath: string): Promise<T | null> {
+  try {
+    const raw = await readFile(filePath, "utf-8");
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeNote(value: unknown): Note | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const note = value as {
+    slug?: unknown;
+    name?: unknown;
+    image?: unknown;
+    imageAlt?: unknown;
+    content?: unknown;
+  };
+
+  const slug = typeof note.slug === "string" ? note.slug.trim().toLowerCase() : "";
+  if (!slug) {
+    return null;
+  }
+
+  return {
+    slug,
+    name: typeof note.name === "string" ? note.name.trim() : "",
+    image: typeof note.image === "string" ? note.image.trim() : "",
+    imageAlt: typeof note.imageAlt === "string" ? note.imageAlt.trim() : "",
+    content: typeof note.content === "string" ? note.content.trim() : "",
+  };
+}
+
+function normalizePerfume(value: unknown): Perfume | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const perfume = value as {
+    id?: unknown;
+    slug?: unknown;
+    name?: unknown;
+    brand?: unknown;
+    gender?: unknown;
+    image?: unknown;
+    imageAlt?: unknown;
+    stockStatus?: unknown;
+    inStock?: unknown;
+    externalLink?: unknown;
+    sizes?: unknown;
+    noteSlugs?: {
+      top?: unknown;
+      heart?: unknown;
+      base?: unknown;
+    };
+  };
+
+  const slug = typeof perfume.slug === "string" ? perfume.slug.trim().toLowerCase() : "";
+  if (!slug) {
+    return null;
+  }
+
+  const sizes = Array.isArray(perfume.sizes)
+    ? perfume.sizes
+        .map((size) => {
+          if (!size || typeof size !== "object") {
+            return null;
+          }
+
+          const parsed = size as { ml?: unknown; price?: unknown; label?: unknown };
+          const ml = Number(parsed.ml);
+          const price = Number(parsed.price);
+
+          if (!Number.isFinite(ml) || !Number.isFinite(price)) {
+            return null;
+          }
+
+          return {
+            ml,
+            price,
+            label: typeof parsed.label === "string" && parsed.label.trim() ? parsed.label.trim() : `${ml}ML`,
+          };
+        })
+        .filter((item): item is PerfumeSize => item !== null)
+        .sort((a, b) => a.ml - b.ml)
+    : [];
+
+  const normalizeSlugArray = (input: unknown) =>
+    Array.isArray(input)
+      ? input
+          .map((item) => (typeof item === "string" ? item.trim().toLowerCase() : ""))
+          .filter(Boolean)
+      : [];
+
+  const image = typeof perfume.image === "string" && perfume.image.trim()
+    ? perfume.image.trim()
+    : getPerfumeImageUrl(slug);
+
+  return {
+    id: typeof perfume.id === "string" && perfume.id.trim() ? perfume.id.trim() : slug,
+    slug,
+    name: typeof perfume.name === "string" ? perfume.name.trim() : "",
+    brand: typeof perfume.brand === "string" ? perfume.brand.trim() : "",
+    gender: typeof perfume.gender === "string" && perfume.gender.trim() ? perfume.gender.trim() : "Unisex",
+    image,
+    imageAlt: typeof perfume.imageAlt === "string" ? perfume.imageAlt.trim() : "",
+    stockStatus:
+      typeof perfume.stockStatus === "string" && perfume.stockStatus.trim()
+        ? perfume.stockStatus.trim()
+        : "Naməlum",
+    inStock: Boolean(perfume.inStock),
+    externalLink: typeof perfume.externalLink === "string" ? perfume.externalLink.trim() : "",
+    sizes,
+    noteSlugs: {
+      top: normalizeSlugArray(perfume.noteSlugs?.top),
+      heart: normalizeSlugArray(perfume.noteSlugs?.heart),
+      base: normalizeSlugArray(perfume.noteSlugs?.base),
+    },
+  };
+}
+
+export async function getNotes(): Promise<Note[]> {
+  const adminNotes = await readJsonSafely<unknown[]>(ADMIN_NOTES_JSON_PATH);
+  if (Array.isArray(adminNotes)) {
+    const parsed = adminNotes
+      .map(normalizeNote)
+      .filter((item): item is Note => item !== null);
+
+    if (parsed.length) {
+      return parsed;
+    }
+  }
+
   const raw = await readFile(NOTES_CSV_PATH, "utf-8").catch(() =>
     readFile(NOTES_CSV_FALLBACK_PATH, "utf-8"),
   );
@@ -126,9 +272,20 @@ export const getNotes = cache(async (): Promise<Note[]> => {
     imageAlt: row["Image:alt"].trim(),
     content: stripHtml(row.Content),
   }));
-});
+}
 
-export const getPerfumes = cache(async (): Promise<Perfume[]> => {
+export async function getPerfumes(): Promise<Perfume[]> {
+  const adminPerfumes = await readJsonSafely<unknown[]>(ADMIN_PERFUMES_JSON_PATH);
+  if (Array.isArray(adminPerfumes)) {
+    const parsed = adminPerfumes
+      .map(normalizePerfume)
+      .filter((item): item is Perfume => item !== null);
+
+    if (parsed.length) {
+      return parsed;
+    }
+  }
+
   const raw = await readFile(PERFUMES_CSV_PATH, "utf-8");
   const rows = parseCsv<PerfumeCsvRow>(raw);
 
@@ -199,7 +356,7 @@ export const getPerfumes = cache(async (): Promise<Perfume[]> => {
   }
 
   return Array.from(bySlug.values());
-});
+}
 
 export async function getFeaturedPerfumes(limit = 8): Promise<Perfume[]> {
   const perfumes = await getPerfumes();
@@ -224,10 +381,32 @@ export async function getPerfumeBySlug(
   const perfume = perfumes.find((item) => item.slug === slug.toLowerCase());
   if (!perfume) return null;
 
-  const noteMap = new Map(notes.map((note) => [note.slug, note]));
+  const noteMap = new Map<string, Note>();
+
+  for (const note of notes) {
+    noteMap.set(note.slug, note);
+
+    const normalizedSlug = normalizeNoteLookupKey(note.slug);
+    if (normalizedSlug && !noteMap.has(normalizedSlug)) {
+      noteMap.set(normalizedSlug, note);
+    }
+
+    const normalizedName = normalizeNoteLookupKey(note.name);
+    if (normalizedName && !noteMap.has(normalizedName)) {
+      noteMap.set(normalizedName, note);
+    }
+  }
 
   const mapSlugs = (slugs: string[]) =>
-    slugs.map((item) => noteMap.get(item) ?? fallbackNote(item));
+    slugs.map((item) => {
+      const direct = noteMap.get(item);
+      if (direct) {
+        return direct;
+      }
+
+      const normalized = normalizeNoteLookupKey(item);
+      return noteMap.get(normalized) ?? fallbackNote(item);
+    });
 
   return {
     ...perfume,

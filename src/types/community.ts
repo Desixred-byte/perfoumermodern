@@ -1,0 +1,16 @@
+export type CommentRow = {
+  id: string;
+  user_id: string;
+  username: string;
+  user_email?: string | null;
+  perfume_slug: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+};
+
+export type WishlistRow = {
+  user_id: string;
+  perfume_slug: string;
+  created_at: string;
+};
