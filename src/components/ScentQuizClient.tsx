@@ -46,6 +46,58 @@ type QuizDictionary = {
   questions: Question[];
 };
 
+type AiCopy = {
+  title: string;
+  description: string;
+  promptLabel: string;
+  promptPlaceholder: string;
+  promptHint: string;
+  run: string;
+  running: string;
+  followUps: string;
+  apiMissing: string;
+  failed: string;
+};
+
+const AI_COPY: Record<Locale, AiCopy> = {
+  az: {
+    title: "AI ilə daha dəqiq seçim",
+    description: "İstəyini sərbəst yaz, AI nəticəni şəxsiləşdirsin.",
+    promptLabel: "Əlavə istəyin",
+    promptPlaceholder: "Məsələn: Yay üçün təravətli, ağır olmayan, ofisə uyğun və qadınların çox bəyəndiyi bir qoxu istəyirəm.",
+    promptHint: "Qeyd: xarakter, mövsüm, sevdiyin notlar və istifadə mühitini yazmaq nəticəni yaxşılaşdırır.",
+    run: "AI tövsiyə et",
+    running: "AI düşünür...",
+    followUps: "AI-nin əlavə sualları",
+    apiMissing: "AI konfiqurasiyası tapılmadı. QOXUNU_OPENAI_API_KEY əlavə edin.",
+    failed: "AI tövsiyəsi alınmadı. Yenidən cəhd edin.",
+  },
+  en: {
+    title: "AI refined recommendation",
+    description: "Add a free-text note and let AI personalize your picks.",
+    promptLabel: "Extra preference",
+    promptPlaceholder: "Example: I want a fresh summer scent, not heavy, office-safe, and attractive in close encounters.",
+    promptHint: "Tip: include mood, season, favorite notes, and context for stronger results.",
+    run: "Get AI picks",
+    running: "AI is thinking...",
+    followUps: "AI follow-up questions",
+    apiMissing: "AI is not configured. Add QOXUNU_OPENAI_API_KEY.",
+    failed: "Could not get AI recommendations. Please try again.",
+  },
+  ru: {
+    title: "Точный подбор с AI",
+    description: "Опишите пожелания свободным текстом, и AI персонализирует выбор.",
+    promptLabel: "Дополнительный запрос",
+    promptPlaceholder: "Например: Нужен свежий летний аромат, не слишком тяжелый, подходящий для офиса и приятный на близкой дистанции.",
+    promptHint: "Совет: добавьте настроение, сезон, любимые ноты и контекст использования.",
+    run: "Получить AI-подбор",
+    running: "AI анализирует...",
+    followUps: "Дополнительные вопросы от AI",
+    apiMissing: "AI не настроен. Добавьте QOXUNU_OPENAI_API_KEY.",
+    failed: "Не удалось получить рекомендации AI. Попробуйте снова.",
+  },
+};
+
 const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
   az: {
     eyebrow: "Qoxunu Tap",
@@ -424,9 +476,15 @@ function scorePerfume(perfume: Perfume, answers: QuizAnswers) {
 
 export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; locale: Locale }) {
   const dictionary = QUIZ_DICTIONARY[locale];
+  const aiCopy = AI_COPY[locale];
   const [answers, setAnswers] = useState<QuizAnswers>(INITIAL_ANSWERS);
   const [stepIndex, setStepIndex] = useState(0);
   const [questionCardHeight, setQuestionCardHeight] = useState<number | null>(null);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiMatches, setAiMatches] = useState<Perfume[] | null>(null);
+  const [aiFollowUps, setAiFollowUps] = useState<string[]>([]);
+  const [isAiLoading, setIsAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
   const questionCardRef = useRef<HTMLDivElement | null>(null);
   const questionCardInnerRef = useRef<HTMLDivElement | null>(null);
   const totalSteps = dictionary.questions.length;
@@ -447,6 +505,10 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
       .slice(0, 3)
       .map((item) => item.perfume);
   }, [answers, isComplete, perfumes]);
+
+  const perfumesBySlug = useMemo(() => new Map(perfumes.map((item) => [item.slug, item])), [perfumes]);
+
+  const shownMatches = aiMatches && aiMatches.length ? aiMatches : topMatches;
 
   const progress = Math.round(((Math.min(stepIndex, totalSteps)) / totalSteps) * 100);
 
@@ -472,6 +534,54 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   const onRestart = () => {
     setAnswers(INITIAL_ANSWERS);
     setStepIndex(0);
+    setAiPrompt("");
+    setAiMatches(null);
+    setAiFollowUps([]);
+    setAiError("");
+  };
+
+  const requestAiRecommendations = async () => {
+    setIsAiLoading(true);
+    setAiError("");
+
+    try {
+      const response = await fetch("/api/qoxunu/recommend", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          locale,
+          answers,
+          freeText: aiPrompt,
+          fallbackSlugs: topMatches.map((item) => item.slug),
+        }),
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        slugs?: string[];
+        followUpQuestions?: string[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        const normalizedError = (payload.error || "").toLowerCase();
+        setAiError(normalizedError.includes("openai_api_key") ? aiCopy.apiMissing : payload.error || aiCopy.failed);
+        setIsAiLoading(false);
+        return;
+      }
+
+      const mapped = (payload.slugs ?? [])
+        .map((slug) => perfumesBySlug.get(slug))
+        .filter((item): item is Perfume => Boolean(item));
+
+      setAiMatches(mapped.length ? mapped : null);
+      setAiFollowUps((payload.followUpQuestions ?? []).slice(0, 3));
+    } catch {
+      setAiError(aiCopy.failed);
+    } finally {
+      setIsAiLoading(false);
+    }
   };
 
   useLayoutEffect(() => {
@@ -609,9 +719,51 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
             </div>
           </div>
 
-          {topMatches.length ? (
+          <div className="mt-4 rounded-[1.5rem] border border-zinc-200 bg-white px-4 py-4 sm:px-5 sm:py-5">
+            <p className="text-sm font-semibold tracking-[0.14em] text-zinc-500 uppercase">{aiCopy.title}</p>
+            <p className="mt-2 text-sm text-zinc-600">{aiCopy.description}</p>
+
+            <label className="mt-3 block">
+              <span className="mb-1.5 block text-sm text-zinc-700">{aiCopy.promptLabel}</span>
+              <textarea
+                value={aiPrompt}
+                onChange={(event) => setAiPrompt(event.target.value)}
+                rows={4}
+                placeholder={aiCopy.promptPlaceholder}
+                className="w-full resize-none rounded-2xl bg-[#f7f7f6] px-4 py-3 text-sm text-zinc-800 outline-none ring-1 ring-zinc-200 transition focus:bg-white focus:ring-zinc-300"
+              />
+            </label>
+
+            <p className="mt-2 text-xs text-zinc-500">{aiCopy.promptHint}</p>
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={requestAiRecommendations}
+                disabled={isAiLoading}
+                className="inline-flex min-h-11 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-6 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isAiLoading ? aiCopy.running : aiCopy.run}
+              </button>
+            </div>
+
+            {aiFollowUps.length ? (
+              <div className="mt-4 rounded-2xl bg-[#f7f7f6] px-4 py-3 ring-1 ring-zinc-200">
+                <p className="text-xs font-semibold tracking-[0.14em] text-zinc-500 uppercase">{aiCopy.followUps}</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-zinc-700">
+                  {aiFollowUps.map((item) => (
+                    <li key={item}>• {item}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {aiError ? <p className="mt-3 text-sm text-rose-600">{aiError}</p> : null}
+          </div>
+
+          {shownMatches.length ? (
             <div className="quiz-results-grid mt-7 grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3 xl:gap-5">
-              {topMatches.map((perfume, index) => (
+              {shownMatches.map((perfume, index) => (
                 <div key={perfume.id} className="quiz-result-card-wrap" style={{ animationDelay: `${140 + index * 110}ms` }}>
                   <ProductCard perfume={perfume} locale={locale} />
                 </div>
