@@ -148,7 +148,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
               <span className="brand-wordmark text-[1.45rem] tracking-tight sm:text-3xl">
                 Perfoumer
               </span>
-              <span className="mt-0.5 text-[0.58rem] font-semibold tracking-[0.22em] text-zinc-500 uppercase sm:text-[0.62rem]">
+              <span className="mt-0.5 text-[8px] font-semibold tracking-[0.14em] text-zinc-500 uppercase sm:text-[9px]">
                 {t.header.tagline}
               </span>
             </span>
