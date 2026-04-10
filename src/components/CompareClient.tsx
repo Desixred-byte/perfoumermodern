@@ -393,16 +393,52 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
       </div>
     );
   };
+  const renderPerfumeCard = (perfume: Perfume, compact = false) => (
+    <article
+      key={perfume.id}
+      className={[
+        "group relative overflow-hidden rounded-[1.75rem] border border-zinc-200/90 bg-[linear-gradient(156deg,rgba(255,255,255,0.97)_0%,rgba(248,248,246,0.93)_48%,rgba(242,242,240,0.92)_100%)] p-4 shadow-[0_16px_34px_rgba(20,20,20,0.07)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(20,20,20,0.12)]",
+        compact ? "w-[74vw] max-w-[18.5rem] shrink-0 snap-start" : "",
+      ].join(" ")}
+    >
+      <div className="pointer-events-none absolute inset-x-5 top-3 h-28 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_72%)] opacity-80 blur-xl" />
+      <div className="relative mx-auto grid h-52 place-items-center overflow-hidden rounded-[1.25rem] border border-white/80 bg-[linear-gradient(170deg,rgba(255,255,255,0.96)_0%,rgba(239,239,236,0.88)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
+        <div className="absolute bottom-4 h-14 w-36 rounded-full bg-zinc-900/15 blur-2xl" />
+        <Image
+          src={perfume.image}
+          alt={perfume.imageAlt || perfume.name}
+          width={260}
+          height={340}
+          className="relative h-44 w-auto max-w-full object-contain drop-shadow-[0_20px_26px_rgba(0,0,0,0.18)] transition-transform duration-500 group-hover:scale-[1.03]"
+        />
+      </div>
+      <div className="mt-3 flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[0.7rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
+            {perfume.brand || "-"}
+          </p>
+          <p className="mt-1 truncate text-[1.35rem] leading-tight font-semibold tracking-[-0.02em] text-zinc-900">
+            {perfume.name}
+          </p>
+        </div>
+        <span className="shrink-0 rounded-full border border-zinc-200 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-600">
+          {perfume.sizes[0] ? `${perfume.sizes[0].price} ₼` : copy.noPrice}
+        </span>
+      </div>
+      <Link
+        href={`/perfumes/${perfume.slug}`}
+        className="mt-3 inline-flex items-center gap-2 rounded-full border border-zinc-300/90 bg-white/90 px-3.5 py-1.5 text-xs font-semibold tracking-[0.1em] text-zinc-700 uppercase transition-all duration-300 hover:border-zinc-400 hover:bg-white hover:text-zinc-900"
+      >
+        {copy.openProduct}
+        <ArrowRight size={12} weight="bold" />
+      </Link>
+    </article>
+  );
 
   return (
     <section ref={shellRef} className="space-y-6 pb-10">
-      <section className="rounded-[2rem] border border-zinc-200/80 bg-[linear-gradient(165deg,rgba(255,255,255,0.96)_0%,rgba(247,247,245,0.9)_100%)] p-6 shadow-[0_16px_40px_rgba(20,20,20,0.06)] md:p-8">
-        <h1 className="text-[2.6rem] leading-[0.95] tracking-[-0.03em] text-zinc-900 md:text-[4.2rem]">
-          {copy.title}
-        </h1>
-        <p className="mt-3 max-w-3xl text-zinc-500">{copy.subtitle}</p>
-
-        <div className="mt-6 grid gap-3 md:grid-cols-3">
+      <section className="space-y-4 border-b border-zinc-200/80 pb-7">
+        <div className="grid gap-3 md:grid-cols-3">
           {Array.from({ length: SLOT_COUNT }, (_, index) => {
             const selected = bySlug.get(selectedSlugs[index] ?? "");
             const options = availableBySlot[index] ?? [];
@@ -495,25 +531,20 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
       </section>
 
       {selectedPerfumes.length < 2 ? (
-        <section className="rounded-[1.6rem] border border-zinc-200 bg-white/90 px-5 py-4 text-sm text-zinc-600 shadow-[0_10px_26px_rgba(24,24,24,0.04)]">
-          {copy.compareHint}
-        </section>
+        <section className="px-1 text-sm text-zinc-600">{copy.compareHint}</section>
       ) : (
         <>
-          <section className="rounded-[1.6rem] border border-zinc-200/90 bg-[linear-gradient(160deg,rgba(255,255,255,0.97)_0%,rgba(247,247,245,0.9)_100%)] p-5 shadow-[0_12px_30px_rgba(20,20,20,0.06)]">
+          <section className="rounded-[1.45rem] border border-zinc-200/85 bg-[linear-gradient(160deg,rgba(255,255,255,0.96)_0%,rgba(247,247,245,0.9)_100%)] p-5 shadow-[0_10px_24px_rgba(20,20,20,0.05)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-[0.72rem] font-semibold tracking-[0.15em] text-zinc-500 uppercase">
-                  {copy.aiSummaryTitle}
-                </p>
-                <p className="mt-1 text-sm text-zinc-600">{copy.aiSummaryDescription}</p>
-              </div>
+              <p className="text-[0.72rem] font-semibold tracking-[0.15em] text-zinc-500 uppercase">
+                {copy.aiSummaryTitle}
+              </p>
               <button
                 type="button"
                 onClick={() => {
                   void summarizeCompare();
                 }}
-                disabled={isAiLoading}
+                disabled={isAiLoading || selectedPerfumes.length < 2}
                 className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300 bg-white px-5 text-sm font-medium text-zinc-800 shadow-[0_8px_20px_rgba(24,24,24,0.08)] transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_12px_24px_rgba(24,24,24,0.12)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <Sparkle size={15} weight="duotone" className={isAiLoading ? "animate-spin" : ""} />
@@ -548,48 +579,19 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
             ) : null}
           </section>
 
+          <section className="md:hidden">
+            <div className="-mx-4 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div className="flex snap-x snap-mandatory gap-3">
+                {selectedPerfumes.map((perfume) => renderPerfumeCard(perfume, true))}
+              </div>
+            </div>
+          </section>
+
           <section
-            className="grid gap-3"
+            className="hidden gap-3 md:grid"
             style={{ gridTemplateColumns: `repeat(${selectedPerfumes.length}, minmax(0, 1fr))` }}
           >
-            {selectedPerfumes.map((perfume) => (
-              <article
-                key={perfume.id}
-                className="group relative overflow-hidden rounded-[1.75rem] border border-zinc-200/90 bg-[linear-gradient(156deg,rgba(255,255,255,0.97)_0%,rgba(248,248,246,0.93)_48%,rgba(242,242,240,0.92)_100%)] p-4 shadow-[0_16px_34px_rgba(20,20,20,0.07)] transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_22px_44px_rgba(20,20,20,0.12)]"
-              >
-                <div className="pointer-events-none absolute inset-x-5 top-3 h-28 rounded-full bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_72%)] opacity-80 blur-xl" />
-                <div className="relative mx-auto grid h-52 place-items-center overflow-hidden rounded-[1.25rem] border border-white/80 bg-[linear-gradient(170deg,rgba(255,255,255,0.96)_0%,rgba(239,239,236,0.88)_100%)] shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
-                  <div className="absolute bottom-4 h-14 w-36 rounded-full bg-zinc-900/15 blur-2xl" />
-                  <Image
-                    src={perfume.image}
-                    alt={perfume.imageAlt || perfume.name}
-                    width={260}
-                    height={340}
-                    className="relative h-44 w-auto max-w-full object-contain drop-shadow-[0_20px_26px_rgba(0,0,0,0.18)] transition-transform duration-500 group-hover:scale-[1.03]"
-                  />
-                </div>
-                <div className="mt-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[0.7rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
-                      {perfume.brand || "-"}
-                    </p>
-                    <p className="mt-1 truncate text-[1.35rem] leading-tight font-semibold tracking-[-0.02em] text-zinc-900">
-                      {perfume.name}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded-full border border-zinc-200 bg-white/90 px-2.5 py-1 text-xs font-medium text-zinc-600">
-                    {perfume.sizes[0] ? `${perfume.sizes[0].price} ₼` : copy.noPrice}
-                  </span>
-                </div>
-                <Link
-                  href={`/perfumes/${perfume.slug}`}
-                  className="mt-3 inline-flex items-center gap-2 rounded-full border border-zinc-300/90 bg-white/90 px-3.5 py-1.5 text-xs font-semibold tracking-[0.1em] text-zinc-700 uppercase transition-all duration-300 hover:border-zinc-400 hover:bg-white hover:text-zinc-900"
-                >
-                  {copy.openProduct}
-                  <ArrowRight size={12} weight="bold" />
-                </Link>
-              </article>
-            ))}
+            {selectedPerfumes.map((perfume) => renderPerfumeCard(perfume))}
           </section>
 
           <section className="overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white/94 shadow-[0_14px_34px_rgba(20,20,20,0.06)]">
