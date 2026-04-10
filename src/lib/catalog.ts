@@ -388,8 +388,66 @@ export async function getRelatedPerfumes(
   limit = 3,
 ): Promise<Perfume[]> {
   const perfumes = await getPerfumes();
+  const current = perfumes.find((item) => item.slug === currentSlug.toLowerCase());
   const candidates = perfumes.filter((item) => item.slug !== currentSlug);
-  return rotateBySeed(candidates, `${currentSlug}-${getDailySeed()}`).slice(0, limit);
+
+  if (!current) {
+    return rotateBySeed(candidates, `${currentSlug}-${getDailySeed()}`).slice(0, limit);
+  }
+
+  const normalizeGender = (value: string) => value.trim().toLowerCase();
+  const targetGender = normalizeGender(current.gender);
+  const targetNotes = {
+    top: new Set(current.noteSlugs.top),
+    heart: new Set(current.noteSlugs.heart),
+    base: new Set(current.noteSlugs.base),
+  };
+  const targetMinPrice =
+    current.sizes.length > 0 ? Math.min(...current.sizes.map((size) => size.price)) : null;
+
+  const scored = candidates.map((candidate) => {
+    let score = 0;
+
+    if (candidate.inStock) {
+      score += 18;
+    }
+
+    if (candidate.brand.toLowerCase() === current.brand.toLowerCase()) {
+      score += 24;
+    }
+
+    const candidateGender = normalizeGender(candidate.gender);
+    if (candidateGender === targetGender) {
+      score += 15;
+    } else if (candidateGender.includes("unisex") || targetGender.includes("unisex")) {
+      score += 7;
+    }
+
+    const overlapTop = candidate.noteSlugs.top.filter((note) => targetNotes.top.has(note)).length;
+    const overlapHeart = candidate.noteSlugs.heart.filter((note) => targetNotes.heart.has(note)).length;
+    const overlapBase = candidate.noteSlugs.base.filter((note) => targetNotes.base.has(note)).length;
+    score += overlapTop * 9 + overlapHeart * 7 + overlapBase * 5;
+
+    const candidateMinPrice =
+      candidate.sizes.length > 0 ? Math.min(...candidate.sizes.map((size) => size.price)) : null;
+    if (targetMinPrice !== null && candidateMinPrice !== null) {
+      const distance = Math.abs(candidateMinPrice - targetMinPrice);
+      score += Math.max(0, 16 - Math.round(distance / 6));
+    }
+
+    const tieBreaker = hashString(`${currentSlug}-${candidate.slug}-${getDailySeed()}`) % 1000;
+    return { candidate, score, tieBreaker };
+  });
+
+  scored.sort((left, right) => {
+    if (right.score !== left.score) {
+      return right.score - left.score;
+    }
+
+    return left.tieBreaker - right.tieBreaker;
+  });
+
+  return scored.slice(0, limit).map((item) => item.candidate);
 }
 
 export async function getPerfumeBySlug(

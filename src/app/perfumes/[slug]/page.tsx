@@ -12,6 +12,7 @@ import { ProductInfoModalButton } from "@/components/ProductInfoModalButton";
 import { ProductCard } from "@/components/ProductCard";
 import { ScrollToTopOnMount } from "@/components/ScrollToTopOnMount";
 import { PerfumeCommentsSection } from "@/components/community/PerfumeCommentsSection";
+import { PerfumeScentSummaryPanel } from "@/components/community/PerfumeScentSummaryPanel";
 import { PerfumeWishlistButton } from "@/components/community/PerfumeWishlistButton";
 import { getPerfumeBySlug, getPerfumes, getRelatedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
@@ -251,16 +252,21 @@ export default async function PerfumeDetailPage({
           </div>
         </div>
 
-        <PerfumeCommentsSection
+        <PerfumeScentSummaryPanel
           perfumeSlug={perfume.slug}
           locale={locale}
           supabase={supabaseConfig}
         />
 
+        <PerfumeCommentsSection perfumeSlug={perfume.slug} locale={locale} supabase={supabaseConfig} />
+
         <section className="mt-24">
           <h2 className="text-5xl leading-[0.98] text-zinc-800 md:text-6xl">
             {t.detail.moreProducts}
           </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-zinc-500 md:text-base">
+            {t.detail.moreProductsHint}
+          </p>
 
           <div className="mt-8 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-3 xl:gap-5">
             {relatedPerfumes.map((item) => (

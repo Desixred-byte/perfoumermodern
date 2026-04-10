@@ -100,7 +100,7 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
     generatingHint: "Nəticə bir neçə saniyə ərzində hazır olacaq.",
     noMatchTitle: "Uyğun nəticə tapılmadı",
     noMatchDescription: "Filtrlər çox dar ola bilər. Testi yenidən başlayıb daha geniş seçimlər et.",
-    aiSummaryLabel: "Sənin qoxu xülasən",
+    aiSummaryLabel: "Sənin qoxu təsvirin",
     showMore: "Daha çox bax",
     showLess: "Az göstər",
     topPickLabel: "Ən uyğun seçim",

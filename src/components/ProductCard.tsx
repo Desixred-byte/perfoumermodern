@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
+import type { CSSProperties } from "react";
 
 import { getDictionary, type Locale } from "@/lib/i18n";
 import type { Perfume } from "@/types/catalog";
@@ -12,10 +13,48 @@ type ProductCardProps = {
   locale?: Locale;
 };
 
+type ShadowProfile = {
+  width: number;
+  bottom: number;
+  blur: number;
+  opacity: number;
+};
+
+const DEFAULT_SHADOW_PROFILE: ShadowProfile = {
+  width: 34,
+  bottom: 11,
+  blur: 0.8,
+  opacity: 1,
+};
+
+const SHADOW_OVERRIDES: Record<string, Partial<ShadowProfile>> = {
+  "qafiya-2": { width: 22, bottom: 8.6, blur: 0.7, opacity: 0.9 },
+  shadow: { width: 24, bottom: 9.2, blur: 0.7, opacity: 0.92 },
+  "first-instinct": { width: 26, bottom: 9.2, blur: 0.75, opacity: 0.93 },
+  "peonia-nobile": { width: 24, bottom: 8.8, blur: 0.75, opacity: 0.9 },
+  "blu-mediterraneo-fico-di-amalfi": { width: 26, bottom: 9, blur: 0.75, opacity: 0.92 },
+  "escada-collection": { width: 27, bottom: 13.8, blur: 0.7, opacity: 0.95 },
+};
+
+function getShadowProfile(slug: string): ShadowProfile {
+  return {
+    ...DEFAULT_SHADOW_PROFILE,
+    ...(SHADOW_OVERRIDES[slug] ?? {}),
+  };
+}
+
 export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
   const startingPrice = perfume.sizes[0]?.price;
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const t = getDictionary(locale);
+  const shadowProfile = getShadowProfile(perfume.slug);
+
+  const shadowStyle = {
+    "--shadow-width": `${shadowProfile.width}%`,
+    "--shadow-bottom": `${shadowProfile.bottom}%`,
+    "--shadow-blur": `${shadowProfile.blur}px`,
+    "--shadow-opacity": `${shadowProfile.opacity}`,
+  } as CSSProperties;
 
   const handleCardClick = () => {
     if (typeof window === "undefined") {
@@ -39,21 +78,26 @@ export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
       onClick={handleCardClick}
       className="product-card group relative block rounded-[1.65rem] bg-white p-2.5 shadow-sm ring-1 ring-zinc-200 sm:rounded-3xl sm:p-4"
     >
-      <div className="product-media relative overflow-hidden rounded-[1.2rem] p-2 sm:rounded-2xl sm:p-3">
+      <div className="product-media relative overflow-hidden rounded-[1.2rem] sm:rounded-2xl">
+        <div className="product-stage-gradient pointer-events-none absolute inset-x-0 bottom-0 h-16 sm:h-20" />
         <div
           className={[
-            "absolute inset-2 rounded-[0.9rem] bg-[linear-gradient(100deg,rgba(255,255,255,0.15)_10%,rgba(255,255,255,0.6)_35%,rgba(255,255,255,0.15)_60%)] bg-[length:220%_100%] transition-opacity duration-500 sm:inset-3 sm:rounded-xl",
+            "absolute inset-0 bg-[linear-gradient(100deg,rgba(255,255,255,0.15)_10%,rgba(255,255,255,0.6)_35%,rgba(255,255,255,0.15)_60%)] bg-[length:220%_100%] transition-opacity duration-500",
             isImageLoaded ? "pointer-events-none opacity-0" : "animate-[catalogImageShimmer_1.3s_ease-in-out_infinite] opacity-100",
           ].join(" ")}
         />
         <div className="relative mx-auto h-40 w-full sm:h-56 lg:h-72">
+          <div
+            className="product-ground-shadow pointer-events-none absolute left-1/2 h-3 -translate-x-1/2 rounded-full sm:h-4"
+            style={shadowStyle}
+          />
           <Image
             src={perfume.image}
             alt={perfume.imageAlt || perfume.name}
             fill
             sizes="(max-width: 639px) 44vw, (max-width: 1023px) 42vw, (max-width: 1279px) 28vw, 22vw"
             className={[
-              "product-image rounded-[0.9rem] object-contain transition-opacity duration-500 sm:rounded-xl",
+              "product-image object-contain object-bottom transition-opacity duration-500",
               isImageLoaded ? "opacity-100" : "opacity-0",
             ].join(" ")}
             onLoad={() => setIsImageLoaded(true)}

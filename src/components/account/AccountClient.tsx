@@ -382,6 +382,16 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
       return;
     }
 
+    // Keep historical comments in sync with the latest chosen username.
+    const commentsUsernameSync = await supabase
+      .from("comments")
+      .update({ username: normalizedUsername })
+      .eq("user_id", userId);
+
+    if (commentsUsernameSync.error?.message.toLowerCase().includes("username")) {
+      // Ignore environments where comments.username column is not present.
+    }
+
     showNotice(copy.profileSaved, "success");
     setProfileAction({ phase: "success", text: copy.profileSaved });
     scheduleProfileActionReset(3200);

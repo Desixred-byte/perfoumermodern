@@ -31,6 +31,8 @@ type Copy = {
   average: string;
   reviews: string;
   noComments: string;
+  noRatingsYet: string;
+  firstReviewPrompt: string;
   loading: string;
   unknownUser: string;
   heartsValue: string;
@@ -64,6 +66,8 @@ const copyByLocale: Record<Locale, Copy> = {
     average: "Orta qiymət",
     reviews: "rəy",
     noComments: "Hələ rəy yoxdur — ilk təcrübəni sən paylaş.",
+    noRatingsYet: "Hələ qiymətləndirmə yoxdur",
+    firstReviewPrompt: "Bu məhsulu ilk dəyərləndirən sən ol",
     loading: "Yüklənir...",
     unknownUser: "İstifadəçi",
     heartsValue: "{count}/5 ürək",
@@ -95,6 +99,8 @@ const copyByLocale: Record<Locale, Copy> = {
     average: "Average rating",
     reviews: "reviews",
     noComments: "No reviews yet — be the first to share your experience.",
+    noRatingsYet: "No ratings yet",
+    firstReviewPrompt: "Be the first to rate this perfume",
     loading: "Loading...",
     unknownUser: "User",
     heartsValue: "{count}/5 hearts",
@@ -126,6 +132,8 @@ const copyByLocale: Record<Locale, Copy> = {
     average: "Средний рейтинг",
     reviews: "отзывов",
     noComments: "Пока нет отзывов — поделитесь впечатлением первым.",
+    noRatingsYet: "Пока нет оценок",
+    firstReviewPrompt: "Станьте первым, кто оценит этот аромат",
     loading: "Загрузка...",
     unknownUser: "Пользователь",
     heartsValue: "{count}/5 сердец",
@@ -160,6 +168,20 @@ const getUsernameFromEmail = (email: string | null | undefined) => {
   return localPart.slice(0, 40);
 };
 
+const getUsernameFromMetadata = (metadata: unknown) => {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const meta = metadata as Record<string, unknown>;
+  const candidates = [meta.username, meta.full_name, meta.name]
+    .filter((value): value is string => typeof value === "string")
+    .map((value) => value.trim())
+    .filter(Boolean);
+
+  return candidates[0] ?? "";
+};
+
 const normalizeCommentRows = (rows: unknown[]): CommentRow[] => {
   return rows
     .filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null)
@@ -190,12 +212,15 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
   const [comments, setComments] = useState<CommentRow[]>([]);
   const [isLoading, setIsLoading] = useState(() => Boolean(supabase));
   const [rating, setRating] = useState(5);
+  const [hoverRating, setHoverRating] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageTone, setMessageTone] = useState<"success" | "error">("error");
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number>(0);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+
+  const effectiveRating = hoverRating ?? rating;
 
   const loginHref = useMemo(() => {
     const nextPath = pathname || `/perfumes/${perfumeSlug}`;
@@ -292,6 +317,15 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     return comments.some((item) => item.user_id === userId);
   }, [comments, session?.user?.id]);
 
+  const currentSessionUsername = useMemo(() => {
+    const metadataName = getUsernameFromMetadata(session?.user?.user_metadata);
+    if (metadataName) {
+      return metadataName;
+    }
+
+    return getUsernameFromEmail(session?.user?.email);
+  }, [session?.user?.email, session?.user?.user_metadata]);
+
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -341,10 +375,7 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     setMessage("");
     setMessageTone("error");
 
-    const metadataUsername =
-      typeof session.user.user_metadata?.username === "string"
-        ? session.user.user_metadata.username.trim()
-        : "";
+    const metadataUsername = getUsernameFromMetadata(session.user.user_metadata);
     const commentUsername = metadataUsername || getUsernameFromEmail(session.user.email);
 
     if (!commentUsername) {
@@ -449,11 +480,14 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                 {copy.average}
               </p>
               <div className="mt-2 flex items-end gap-3">
-                <p className="text-5xl leading-none tracking-[-0.03em] text-zinc-900">{average ?? "-"}</p>
+                <p className="text-5xl leading-none tracking-[-0.03em] text-zinc-900">{average ?? "0.0"}</p>
                 <p className="mb-1 text-sm text-zinc-500">
                   {comments.length} {copy.reviews}
                 </p>
               </div>
+              {!average ? (
+                <p className="mt-2 text-xs tracking-[0.08em] text-zinc-400 uppercase">{copy.noRatingsYet}</p>
+              ) : null}
               <div className="mt-3 flex items-center gap-1.5 text-rose-500">
                 {[1, 2, 3, 4, 5].map((value) => (
                   <Heart
@@ -466,6 +500,7 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                           ? "duotone"
                           : "regular"
                     }
+                    className={!average ? "text-zinc-300" : undefined}
                   />
                 ))}
               </div>
@@ -492,25 +527,37 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                 </span>
                 <div className="flex items-center gap-2.5">
                   {[1, 2, 3, 4, 5].map((value) => {
-                    const active = value <= rating;
+                    const active = value <= effectiveRating;
                     return (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setRating(value)}
-                        className="grid h-9 w-9 place-items-center text-zinc-300 transition hover:scale-110 hover:text-rose-400"
+                        onMouseEnter={() => setHoverRating(value)}
+                        onMouseLeave={() => setHoverRating(null)}
+                        onFocus={() => setHoverRating(value)}
+                        onBlur={() => setHoverRating(null)}
+                        className="group grid h-10 w-10 place-items-center rounded-full text-zinc-300 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:scale-[1.06] hover:text-rose-400 active:scale-95"
                         aria-label={formatMessage(copy.chooseHearts, { count: value })}
+                        aria-pressed={rating === value}
                       >
                         <Heart
                           size={24}
                           weight={active ? "fill" : "regular"}
-                          className={active ? "text-rose-500" : "text-zinc-300"}
+                          className={[
+                            "transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                            active
+                              ? "scale-[1.02] text-rose-500 drop-shadow-[0_3px_10px_rgba(244,63,94,0.35)]"
+                              : "text-zinc-300 group-hover:text-rose-300",
+                          ].join(" ")}
                         />
                       </button>
                     );
                   })}
                 </div>
-                <p className="mt-2 text-xs text-zinc-500">{formatMessage(copy.heartsValue, { count: rating })}</p>
+                <p className="mt-2 text-xs text-zinc-500">
+                  {formatMessage(copy.heartsValue, { count: effectiveRating })}
+                </p>
               </label>
 
               <label className="block">
@@ -557,12 +604,15 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
 
         <div className="space-y-4">
           {isLoading ? <p className="text-sm text-zinc-500">{copy.loading}</p> : null}
-          {!isLoading && sortedComments.length === 0 ? (
-            <p className="text-sm italic text-zinc-500">{copy.noComments}</p>
-          ) : null}
 
           {!isLoading
-            ? sortedComments.map((item) => (
+            ? sortedComments.map((item) => {
+                const isOwnComment = !!session?.user?.id && item.user_id === session.user.id;
+                const displayUsername = isOwnComment
+                  ? currentSessionUsername || item.username || copy.unknownUser
+                  : item.username || copy.unknownUser;
+
+                return (
                 <article
                   key={item.id}
                   className="rounded-2xl bg-white p-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] md:p-6"
@@ -570,10 +620,10 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700">
-                        {(item.username || copy.unknownUser).slice(0, 1).toUpperCase()}
+                        {displayUsername.slice(0, 1).toUpperCase()}
                       </div>
                       <div className="flex items-center gap-2.5">
-                        <p className="text-sm font-medium text-zinc-800">{item.username || copy.unknownUser}</p>
+                        <p className="text-sm font-medium text-zinc-800">{displayUsername}</p>
                         <div className="flex items-center gap-1 text-rose-500">
                           {[1, 2, 3, 4, 5].map((value) => (
                             <Heart
@@ -595,7 +645,8 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                   <div className="my-4 h-px bg-[rgba(0,0,0,0.05)]" />
                   <p className="text-sm leading-7 text-zinc-700">{item.comment}</p>
                 </article>
-              ))
+                );
+              })
             : null}
         </div>
       </div>

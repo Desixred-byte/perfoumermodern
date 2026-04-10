@@ -49,7 +49,17 @@ type ActiveChip = {
   icon?: ReactNode;
 };
 
+type SearchSuggestion = {
+  id: string;
+  label: string;
+  type: "brand" | "perfume";
+  value: string;
+  subLabel?: string;
+  score: number;
+};
+
 const PAGE_SIZE = 8;
+const isNonNull = <T,>(value: T | null): value is T => value !== null;
 
 function getStartingPrice(perfume: Perfume) {
   return perfume.sizes[0]?.price ?? Number.POSITIVE_INFINITY;
@@ -152,6 +162,8 @@ export function CatalogClient({
 }: CatalogClientProps) {
   const t = getDictionary(locale);
   const [query, setQuery] = useState("");
+  const [draftQuery, setDraftQuery] = useState("");
+  const [suggestionQuery, setSuggestionQuery] = useState("");
   const [selectedGender, setSelectedGender] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState(initialBrand);
   const [selectedTopNote, setSelectedTopNote] = useState(
@@ -168,12 +180,23 @@ export function CatalogClient({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isFiltersPanelOpen, setIsFiltersPanelOpen] = useState(false);
   const [isPortalReady, setIsPortalReady] = useState(false);
+  const [isSuggestionOpen, setIsSuggestionOpen] = useState(false);
+  const [activeSuggestionIndex, setActiveSuggestionIndex] = useState(-1);
   const deferredQuery = useDeferredValue(query);
   const refreshTimerRef = useRef<number | null>(null);
+  const suggestionTimerRef = useRef<number | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   const lockedTopNote = lockedNoteFilter?.type === "top" ? lockedNoteFilter.slug : "all";
   const lockedHeartNote = lockedNoteFilter?.type === "heart" ? lockedNoteFilter.slug : "all";
   const lockedBaseNote = lockedNoteFilter?.type === "base" ? lockedNoteFilter.slug : "all";
+
+  useEffect(() => {
+    // Keep internal note states aligned with externally locked note type switches.
+    setSelectedTopNote(lockedTopNote);
+    setSelectedHeartNote(lockedHeartNote);
+    setSelectedBaseNote(lockedBaseNote);
+  }, [lockedTopNote, lockedHeartNote, lockedBaseNote]);
 
   const triggerRefresh = () => {
     setVisibleCount(PAGE_SIZE);
@@ -188,9 +211,17 @@ export function CatalogClient({
     }, 260);
   };
 
-  const updateQuery = (value: string) => {
+  const commitQuery = (value: string) => {
     setQuery(value);
+    setDraftQuery(value);
+    setSuggestionQuery(value);
     triggerRefresh();
+  };
+
+  const commitDraftQuery = () => {
+    commitQuery(draftQuery);
+    setIsSuggestionOpen(false);
+    setActiveSuggestionIndex(-1);
   };
 
   const updateGender = (value: string) => {
@@ -225,6 +256,7 @@ export function CatalogClient({
 
   const resetFilters = () => {
     setQuery("");
+    setDraftQuery("");
     startTransition(() => {
       setSelectedGender("all");
       setSelectedBrand(initialBrand);
@@ -245,6 +277,83 @@ export function CatalogClient({
     const unique = new Set(perfumes.map((item) => item.brand.trim()).filter(Boolean));
     return ["all", ...Array.from(unique).sort((a, b) => a.localeCompare(b))];
   }, [perfumes]);
+
+  const searchSuggestions = useMemo(() => {
+    const normalizedQuery = suggestionQuery.trim().toLowerCase();
+    if (!normalizedQuery || normalizedQuery.length < 2) {
+      return [] as SearchSuggestion[];
+    }
+
+    const brandSuggestions = brands
+      .filter((brand) => brand !== "all")
+      .map((brand): SearchSuggestion | null => {
+        const normalizedBrand = brand.toLowerCase();
+        const startsWith = normalizedBrand.startsWith(normalizedQuery);
+        const includes = normalizedBrand.includes(normalizedQuery);
+        if (!startsWith && !includes) {
+          return null;
+        }
+
+        const brandProductCount = perfumes.filter(
+          (item) => item.brand.toLowerCase() === normalizedBrand,
+        ).length;
+
+        let score = startsWith ? 160 : 110;
+        score += Math.min(30, brandProductCount * 2);
+
+        return {
+          id: `brand-${normalizedBrand}`,
+          label: brand,
+          type: "brand" as const,
+          value: brand,
+          subLabel: `${brandProductCount}`,
+          score,
+        };
+      })
+      .filter(isNonNull)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4);
+
+    const perfumeSuggestions = perfumes
+      .map((perfume): SearchSuggestion | null => {
+        const normalizedName = perfume.name.toLowerCase();
+        const normalizedBrand = perfume.brand.toLowerCase();
+
+        const nameStartsWith = normalizedName.startsWith(normalizedQuery);
+        const nameIncludes = normalizedName.includes(normalizedQuery);
+        const brandStartsWith = normalizedBrand.startsWith(normalizedQuery);
+        const brandIncludes = normalizedBrand.includes(normalizedQuery);
+
+        if (!nameStartsWith && !nameIncludes && !brandStartsWith && !brandIncludes) {
+          return null;
+        }
+
+        let score = 0;
+        if (nameStartsWith) score += 180;
+        else if (nameIncludes) score += 130;
+        if (brandStartsWith) score += 110;
+        else if (brandIncludes) score += 70;
+        if (perfume.inStock) score += 10;
+
+        return {
+          id: `perfume-${perfume.slug}`,
+          label: perfume.name,
+          type: "perfume" as const,
+          value: perfume.name,
+          subLabel: perfume.brand,
+          score,
+        };
+      })
+      .filter(isNonNull)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6);
+
+    const merged = [...brandSuggestions, ...perfumeSuggestions]
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 7);
+
+    return merged;
+  }, [brands, perfumes, suggestionQuery]);
 
   const topNotes = useMemo(() => {
     const unique = new Set(perfumes.flatMap((item) => item.noteSlugs.top));
@@ -335,8 +444,27 @@ export function CatalogClient({
       if (refreshTimerRef.current) {
         window.clearTimeout(refreshTimerRef.current);
       }
+      if (suggestionTimerRef.current) {
+        window.clearTimeout(suggestionTimerRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (suggestionTimerRef.current) {
+      window.clearTimeout(suggestionTimerRef.current);
+    }
+
+    suggestionTimerRef.current = window.setTimeout(() => {
+      setSuggestionQuery(draftQuery);
+    }, 170);
+
+    return () => {
+      if (suggestionTimerRef.current) {
+        window.clearTimeout(suggestionTimerRef.current);
+      }
+    };
+  }, [draftQuery]);
 
   useEffect(() => {
     setIsPortalReady(true);
@@ -364,11 +492,50 @@ export function CatalogClient({
     };
   }, [isFiltersPanelOpen]);
 
+  useEffect(() => {
+    setActiveSuggestionIndex(-1);
+  }, [draftQuery]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: MouseEvent) => {
+      const node = searchContainerRef.current;
+      if (!node) {
+        return;
+      }
+
+      if (!node.contains(event.target as Node)) {
+        setIsSuggestionOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+    };
+  }, []);
+
+  const applySuggestion = (suggestion: SearchSuggestion) => {
+    if (suggestion.type === "brand") {
+      updateBrand(suggestion.value);
+      commitQuery(suggestion.value);
+    } else {
+      commitQuery(suggestion.value);
+    }
+
+    setIsSuggestionOpen(false);
+    setActiveSuggestionIndex(-1);
+  };
+
   const visiblePerfumes = filteredPerfumes.slice(0, visibleCount);
   const hasMore = visibleCount < filteredPerfumes.length;
   const hasSearchQuery = query.trim().length > 0;
+  const normalizedQuery = query.trim().toLowerCase();
+  const isQueryMirroringBrand =
+    normalizedQuery.length > 0 &&
+    selectedBrand !== "all" &&
+    normalizedQuery === selectedBrand.toLowerCase();
   const activeFilterCount = [
-    query.trim() !== "",
+    query.trim() !== "" && !isQueryMirroringBrand,
     selectedGender !== "all",
     selectedBrand !== initialBrand,
     selectedTopNote !== lockedTopNote,
@@ -378,11 +545,11 @@ export function CatalogClient({
   ].filter(Boolean).length;
 
   const activeChips: ActiveChip[] = [
-    query.trim()
+    query.trim() && !isQueryMirroringBrand
       ? {
           key: "query",
           label: query.trim(),
-          onClear: () => updateQuery(""),
+          onClear: () => commitQuery(""),
           icon: <MagnifyingGlass size={12} weight="bold" />,
         }
       : null,
@@ -437,70 +604,153 @@ export function CatalogClient({
 
   return (
     <>
-      <section className="relative z-30 mt-8 overflow-hidden rounded-[2rem] border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,249,246,0.84)_100%)] p-4 shadow-[0_18px_50px_rgba(26,26,26,0.06)] backdrop-blur-sm sm:p-5 md:p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] bg-zinc-900 text-white shadow-[0_12px_24px_rgba(24,24,24,0.18)]">
-                <SlidersHorizontal size={18} weight="bold" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[0.66rem] font-medium tracking-[0.24em] text-zinc-400 uppercase">
-                  {t.catalog.filters}
-                </p>
-                <p className="mt-2 max-w-2xl text-base leading-relaxed text-zinc-700 sm:text-lg">
-                  {panelDescription}
-                </p>
-              </div>
-            </div>
-
-            {activeFilterCount > 0 ? (
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-zinc-200/80 bg-white/80 px-3 py-1.5 text-sm text-zinc-500 shadow-[0_8px_20px_rgba(24,24,24,0.04)]">
-                <Sparkle size={14} weight="fill" className="text-zinc-400" />
-                {formatMessage(t.catalog.activeChoices, { count: activeFilterCount })}
-              </div>
-            ) : null}
-          </div>
-
-          {activeFilterCount > 0 ? (
-            <button
-              type="button"
-              onClick={resetFilters}
-              className="inline-flex items-center gap-2 self-start rounded-full border border-zinc-200/80 bg-white/90 px-4 py-2 text-sm font-medium text-zinc-600 transition-all duration-300 hover:border-zinc-300 hover:text-zinc-900 hover:shadow-[0_10px_24px_rgba(24,24,24,0.06)] lg:self-auto"
-            >
-              <X size={14} weight="bold" />
-              {t.catalog.reset}
-            </button>
-          ) : null}
-        </div>
-
-        <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
-          <label className="flex items-center gap-3 rounded-[1.5rem] border border-zinc-200/75 bg-white/88 px-4 py-3 shadow-[0_12px_28px_rgba(24,24,24,0.05)] transition-all duration-300 focus-within:border-zinc-300 focus-within:shadow-[0_16px_34px_rgba(24,24,24,0.07)]">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-zinc-50 text-zinc-500">
+      <section className="relative z-30 mt-4 overflow-visible px-1 sm:px-0">
+        <div className="mt-1 grid gap-2 py-1 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+          <div ref={searchContainerRef} className="relative">
+          <label className="flex items-center gap-3 rounded-none border-b border-zinc-300/70 bg-transparent px-1 py-2.5 transition-all duration-300 focus-within:border-zinc-500">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-zinc-300/70 bg-zinc-50 text-zinc-600">
               <MagnifyingGlass size={18} weight="bold" />
             </div>
             <div className="min-w-0 flex-1">
               <input
-                value={query}
-                onChange={(event) => updateQuery(event.target.value)}
+                value={draftQuery}
+                onChange={(event) => {
+                  setDraftQuery(event.target.value);
+                  setIsSuggestionOpen(true);
+                }}
+                onFocus={() => setIsSuggestionOpen(true)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    if (isSuggestionOpen && activeSuggestionIndex >= 0 && searchSuggestions.length) {
+                      event.preventDefault();
+                      const suggestion = searchSuggestions[activeSuggestionIndex];
+                      if (suggestion) {
+                        applySuggestion(suggestion);
+                      }
+                      return;
+                    }
+
+                    event.preventDefault();
+                    commitDraftQuery();
+                    return;
+                  }
+
+                  if (!searchSuggestions.length) {
+                    return;
+                  }
+
+                  if (event.key === "ArrowDown") {
+                    event.preventDefault();
+                    setIsSuggestionOpen(true);
+                    setActiveSuggestionIndex((prev) =>
+                      prev >= searchSuggestions.length - 1 ? 0 : prev + 1,
+                    );
+                  }
+
+                  if (event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setIsSuggestionOpen(true);
+                    setActiveSuggestionIndex((prev) =>
+                      prev <= 0 ? searchSuggestions.length - 1 : prev - 1,
+                    );
+                  }
+
+                  if (event.key === "Escape") {
+                    setIsSuggestionOpen(false);
+                    setActiveSuggestionIndex(-1);
+                  }
+                }}
                 placeholder={t.catalog.searchPlaceholder}
                 className="mt-0.5 w-full bg-transparent text-[1rem] text-zinc-800 outline-none placeholder:text-zinc-400"
               />
             </div>
-            {query ? (
-              <button
-                type="button"
-                onClick={() => updateQuery("")}
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 transition hover:bg-zinc-200 hover:text-zinc-800"
-                aria-label={t.catalog.reset}
-              >
-                <X size={13} weight="bold" />
-              </button>
-            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (!draftQuery) {
+                  return;
+                }
+
+                commitQuery("");
+              }}
+              tabIndex={draftQuery ? 0 : -1}
+              aria-hidden={!draftQuery}
+              className={[
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-zinc-300/70 bg-zinc-50 text-zinc-600 transition-all duration-250",
+                draftQuery
+                  ? "scale-100 opacity-100 hover:border-zinc-400 hover:bg-zinc-100 hover:text-zinc-900"
+                  : "pointer-events-none scale-75 opacity-0",
+              ].join(" ")}
+              aria-label={t.catalog.reset}
+            >
+              <X size={13} weight="bold" />
+            </button>
           </label>
 
-          <div className="flex flex-wrap items-center gap-3 lg:justify-end">
-            <div className="inline-flex items-center rounded-full border border-zinc-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(24,24,24,0.04)] backdrop-blur-sm">
+          {isSuggestionOpen && searchSuggestions.length ? (
+            <div
+              className="absolute inset-x-0 top-[calc(100%+0.7rem)] z-50 max-h-[20rem] overflow-y-auto overscroll-contain rounded-[1.2rem] border border-zinc-200/80 bg-white/96 p-2 shadow-[0_20px_42px_rgba(24,24,24,0.12)] backdrop-blur"
+              onWheelCapture={(event) => event.stopPropagation()}
+              onTouchMoveCapture={(event) => event.stopPropagation()}
+            >
+              <p className="px-2 py-1 text-[0.62rem] font-medium tracking-[0.2em] text-zinc-500 uppercase">
+                {t.catalog.searchSuggestionsTitle}
+              </p>
+              <div className="mt-1 space-y-1">
+                {searchSuggestions.map((suggestion, index) => {
+                  const isActive = index === activeSuggestionIndex;
+                  return (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      onMouseEnter={() => setActiveSuggestionIndex(index)}
+                      onMouseDown={(event) => {
+                        event.preventDefault();
+                        applySuggestion(suggestion);
+                      }}
+                      className={[
+                        "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200",
+                        isActive
+                          ? "bg-zinc-900 text-white"
+                          : "bg-transparent text-zinc-700 hover:bg-zinc-100",
+                      ].join(" ")}
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{suggestion.label}</p>
+                        {suggestion.subLabel ? (
+                          <p
+                            className={[
+                              "truncate text-xs",
+                              isActive ? "text-zinc-300" : "text-zinc-500",
+                            ].join(" ")}
+                          >
+                            {suggestion.subLabel}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span
+                        className={[
+                          "shrink-0 rounded-full border px-2 py-0.5 text-[0.62rem] font-medium tracking-[0.14em] uppercase",
+                          isActive
+                            ? "border-zinc-500/70 text-zinc-200"
+                            : "border-zinc-200 text-zinc-500",
+                        ].join(" ")}
+                      >
+                        {suggestion.type === "brand"
+                          ? t.catalog.searchSuggestionBrand
+                          : t.catalog.searchSuggestionPerfume}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+          </div>
+
+          <div className="flex flex-col gap-2 items-start lg:items-end">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:gap-3 lg:w-auto lg:justify-end">
+              <div className="inline-flex w-full items-center rounded-full border border-zinc-200/80 bg-white/88 p-1 shadow-[0_10px_24px_rgba(24,24,24,0.04)] backdrop-blur-sm sm:w-auto">
               {genders.map((gender) => {
                 const active = selectedGender === gender;
 
@@ -511,7 +761,7 @@ export function CatalogClient({
                     onClick={() => updateGender(gender)}
                     aria-pressed={active}
                     className={[
-                      "rounded-full px-3.5 py-2 text-sm font-medium transition-all duration-300 sm:px-4",
+                      "flex-1 rounded-full px-3 py-2 text-center text-sm font-medium transition-all duration-300 sm:flex-none sm:px-4",
                       active
                         ? "bg-zinc-900 text-white shadow-[0_10px_22px_rgba(24,24,24,0.16)]"
                         : "text-zinc-500 hover:text-zinc-900",
@@ -521,48 +771,82 @@ export function CatalogClient({
                   </button>
                 );
               })}
-            </div>
+              </div>
 
-            <button
-              type="button"
-              aria-expanded={isFiltersPanelOpen}
-              aria-controls="catalog-advanced-filters"
-              onClick={() => setIsFiltersPanelOpen((open) => !open)}
-              className="inline-flex items-center gap-3 rounded-full border border-zinc-200/80 bg-white/90 px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-[0_10px_24px_rgba(24,24,24,0.04)] transition-all duration-300 hover:border-zinc-300 hover:text-zinc-900 hover:shadow-[0_14px_28px_rgba(24,24,24,0.07)]"
-            >
-              <SlidersHorizontal size={15} weight="bold" />
-              <span>{t.catalog.refine}</span>
-              {activeFilterCount > 0 ? (
-                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-zinc-900 px-2 text-[0.72rem] font-medium text-white">
-                  {activeFilterCount}
+              <button
+                type="button"
+                aria-expanded={isFiltersPanelOpen}
+                aria-controls="catalog-advanced-filters"
+                onClick={() => setIsFiltersPanelOpen((open) => !open)}
+                className="inline-flex min-h-11 items-center gap-3 rounded-full border border-zinc-200/80 bg-white/90 px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-[0_10px_24px_rgba(24,24,24,0.04)] transition-all duration-300 hover:border-zinc-300 hover:text-zinc-900 hover:shadow-[0_14px_28px_rgba(24,24,24,0.07)]"
+              >
+                <span className="relative block h-[15px] w-[15px]">
+                  <SlidersHorizontal
+                    size={15}
+                    weight="bold"
+                    className={[
+                      "absolute inset-0 transition-all duration-300",
+                      isFiltersPanelOpen
+                        ? "-rotate-90 scale-75 opacity-0"
+                        : "rotate-0 scale-100 opacity-100",
+                    ].join(" ")}
+                  />
+                  <X
+                    size={15}
+                    weight="bold"
+                    className={[
+                      "absolute inset-0 transition-all duration-300",
+                      isFiltersPanelOpen
+                        ? "rotate-0 scale-100 opacity-100"
+                        : "rotate-90 scale-75 opacity-0",
+                    ].join(" ")}
+                  />
                 </span>
+                <span>{t.catalog.refine}</span>
+              </button>
+
+              {activeFilterCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-200/80 bg-white/90 px-4 py-2 text-sm font-medium text-zinc-600 transition-all duration-300 hover:border-zinc-300 hover:text-zinc-900 hover:shadow-[0_10px_24px_rgba(24,24,24,0.06)]"
+                >
+                  <X size={14} weight="bold" />
+                  {t.catalog.reset}
+                </button>
               ) : null}
-            </button>
+
+              {activeFilterCount > 0 ? (
+                <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200/80 bg-white/90 px-3 py-1.5 text-sm text-zinc-600 shadow-[0_8px_20px_rgba(24,24,24,0.04)]">
+                  <Sparkle size={14} weight="fill" className="text-zinc-400" />
+                  {formatMessage(t.catalog.activeChoices, { count: activeFilterCount })}
+                </div>
+              ) : null}
+            </div>
           </div>
         </div>
 
         {activeChips.length > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="mr-1 text-[0.62rem] font-medium tracking-[0.24em] text-zinc-400 uppercase">
-              {formatMessage(t.catalog.activeChoices, { count: activeFilterCount })}
-            </span>
-            {activeChips.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={chip.onClear}
-                className="inline-flex max-w-full items-center gap-2 rounded-full border border-zinc-200/80 bg-white/85 px-3 py-2 text-sm text-zinc-600 shadow-[0_8px_18px_rgba(24,24,24,0.04)] transition-all duration-300 hover:border-zinc-300 hover:bg-white hover:text-zinc-900"
-              >
-                {chip.icon ? <span className="text-zinc-400">{chip.icon}</span> : null}
-                <span className="max-w-[10rem] truncate sm:max-w-[14rem]">{chip.label}</span>
-                <X size={12} weight="bold" className="shrink-0 text-zinc-400" />
-              </button>
-            ))}
+          <div className="mt-1 pb-1">
+            <div className="flex flex-wrap items-center gap-2">
+              {activeChips.map((chip) => (
+                <button
+                  key={chip.key}
+                  type="button"
+                  onClick={chip.onClear}
+                  className="inline-flex max-w-full items-center gap-2 rounded-full border border-zinc-200/80 bg-white/85 px-3 py-2 text-sm text-zinc-600 shadow-[0_8px_18px_rgba(24,24,24,0.04)] transition-all duration-300 hover:border-zinc-300 hover:bg-white hover:text-zinc-900"
+                >
+                  {chip.icon ? <span className="text-zinc-400">{chip.icon}</span> : null}
+                  <span className="max-w-[10rem] truncate sm:max-w-[14rem]">{chip.label}</span>
+                  <X size={12} weight="bold" className="shrink-0 text-zinc-400" />
+                </button>
+              ))}
+            </div>
           </div>
         ) : null}
       </section>
 
-      <div className="relative z-10 mt-6 flex flex-col gap-1 px-1 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
+      <div className="relative z-10 mt-1 flex flex-col gap-1 px-1 text-sm text-zinc-500 sm:flex-row sm:items-center sm:justify-between">
         {hasSearchQuery ? (
           <p>{formatMessage(t.catalog.found, { count: filteredPerfumes.length })}</p>
         ) : (
@@ -573,7 +857,7 @@ export function CatalogClient({
 
       <section
         className={[
-          "relative z-10 mt-4 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:gap-5",
+          "relative z-10 mt-2 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:gap-5",
           isRefreshing ? "opacity-95" : "opacity-100",
         ].join(" ")}
       >
@@ -614,7 +898,7 @@ export function CatalogClient({
         ? createPortal(
             <div
               className={[
-                "fixed inset-0 z-[90] overflow-hidden transition-opacity duration-500",
+                "fixed inset-0 z-[90] overflow-hidden transition-opacity duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
                 isFiltersPanelOpen
                   ? "pointer-events-auto opacity-100"
                   : "pointer-events-none opacity-0",
@@ -624,7 +908,7 @@ export function CatalogClient({
               <div
                 aria-hidden="true"
                 className={[
-                  "absolute inset-0 z-0 transition-all duration-500",
+                  "absolute inset-0 z-0 transition-[opacity,backdrop-filter] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
                   isFiltersPanelOpen
                     ? "bg-zinc-950/28 opacity-100 backdrop-blur-[3px]"
                     : "bg-zinc-950/0 opacity-0 backdrop-blur-0",
@@ -649,16 +933,27 @@ export function CatalogClient({
                     "flex w-full flex-col overflow-hidden border border-zinc-200/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,247,0.92)_100%)] backdrop-blur-xl",
                     "max-h-[calc(100dvh-0.45rem)] rounded-t-[1.7rem] rounded-b-none border-x-0 border-b-0",
                     "lg:max-h-[calc(100vh-3rem)] lg:max-w-6xl lg:rounded-[2rem] lg:border",
-                    "transition-[transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
+                    "transition-[transform,opacity] duration-560 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform",
                     "shadow-[0_-24px_70px_rgba(15,15,15,0.18)] lg:shadow-[0_26px_70px_rgba(15,15,15,0.2)]",
                     isFiltersPanelOpen
                       ? "translate-y-0 scale-100 opacity-100"
-                      : "translate-y-16 scale-[0.998] opacity-0 lg:translate-y-4 lg:scale-[0.972]",
+                      : "translate-y-20 scale-[0.992] opacity-0 lg:translate-y-6 lg:scale-[0.972]",
                   ].join(" ")}
                 >
-            <div className="mx-auto mt-3 h-1.5 w-14 rounded-full bg-zinc-200/80 lg:hidden" />
+            <div
+              className={[
+                "mx-auto mt-3 h-1.5 w-14 rounded-full bg-zinc-200/80 transition-all duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] lg:hidden",
+                isFiltersPanelOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+              ].join(" ")}
+            />
 
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-200/70 px-5 pb-4 pt-4 sm:px-6">
+            <div
+              className={[
+                "flex items-start justify-between gap-4 border-b border-zinc-200/70 px-5 pb-4 pt-4 sm:px-6",
+                "transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                isFiltersPanelOpen ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0",
+              ].join(" ")}
+            >
               <div>
                 <p className="text-[0.62rem] font-medium tracking-[0.26em] text-zinc-400 uppercase">
                   {t.catalog.filters}
@@ -691,7 +986,13 @@ export function CatalogClient({
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:px-6">
+            <div
+              className={[
+                "min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] sm:px-6",
+                "transition-all duration-560 delay-75 ease-[cubic-bezier(0.22,1,0.36,1)]",
+                isFiltersPanelOpen ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0",
+              ].join(" ")}
+            >
               <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
                 <SectionShell title={t.catalog.brand} description={t.catalog.allBrands}>
                   <OptionCluster
