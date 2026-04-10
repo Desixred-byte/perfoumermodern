@@ -164,6 +164,7 @@ export function LoginClient({
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState(() => resolveReasonMessage(initialReason, copy));
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const passwordAutocomplete = mode === "login" ? "current-password" : "new-password";
 
   const safeNextPath = useMemo(() => normalizeNextPath(nextPath), [nextPath]);
 
@@ -327,7 +328,11 @@ export function LoginClient({
                 required={mode === "signup"}
                 minLength={3}
                 maxLength={24}
-                autoComplete="username"
+                name="display_name"
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 value={username}
                 onChange={(event) => setUsername(event.target.value)}
                 className="w-full rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-3 text-sm text-zinc-800 outline-none transition focus:border-zinc-400 focus:bg-white"
@@ -340,6 +345,10 @@ export function LoginClient({
             <span className="mb-1.5 block text-sm text-zinc-600">{copy.email}</span>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -351,6 +360,8 @@ export function LoginClient({
             <span className="mb-1.5 block text-sm text-zinc-600">{copy.password}</span>
             <input
               type="password"
+              name="password"
+              autoComplete={passwordAutocomplete}
               required
               minLength={6}
               value={password}

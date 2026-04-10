@@ -100,6 +100,7 @@ export function AuthClient({ locale, nextPath, supabase: supabaseConfig }: AuthC
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const passwordAutocomplete = mode === "signIn" ? "current-password" : "new-password";
 
   const safeNextPath = useMemo(() => normalizeNextPath(nextPath), [nextPath]);
 
@@ -188,6 +189,10 @@ export function AuthClient({ locale, nextPath, supabase: supabaseConfig }: AuthC
             <span className="mb-1.5 block text-sm text-zinc-600">{copy.email}</span>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
               required
               value={email}
               onChange={(event) => setEmail(event.target.value)}
@@ -199,6 +204,8 @@ export function AuthClient({ locale, nextPath, supabase: supabaseConfig }: AuthC
             <span className="mb-1.5 block text-sm text-zinc-600">{copy.password}</span>
             <input
               type="password"
+              name="password"
+              autoComplete={passwordAutocomplete}
               required
               minLength={6}
               value={password}
