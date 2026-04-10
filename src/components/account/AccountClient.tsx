@@ -570,7 +570,17 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         }
 
         const parsed = (data ?? [])
-          .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+          .filter(
+            (
+              item,
+            ): item is {
+              id: unknown;
+              perfume_slug: unknown;
+              rating: unknown;
+              comment: unknown;
+              created_at: unknown;
+            } => typeof item === "object" && item !== null,
+          )
           .map((item) => ({
             id: String(item.id ?? ""),
             perfume_slug: String(item.perfume_slug ?? "").trim().toLowerCase(),
