@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
+
 import { Footer } from "@/components/Footer";
 import { LoginClient } from "@/components/login/LoginClient";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
+
+export const metadata: Metadata = {
+  title: "Giriş",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 type LoginPageProps = {
   searchParams: Promise<{

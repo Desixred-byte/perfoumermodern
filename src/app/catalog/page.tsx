@@ -1,8 +1,28 @@
+import type { Metadata } from "next";
+
 import { CatalogClient } from "@/components/CatalogClient";
 import { Footer } from "@/components/Footer";
 import { getPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
+import { buildAzeriPageKeywords } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Ətir Kataloqu",
+  description:
+    "Perfoumer kataloqunda premium, niş və dizayner ətirlərini brendə, nota və üsluba görə filtr edin və sizin üçün uyğun qoxunu seçin.",
+  keywords: buildAzeriPageKeywords([
+    "ətir kataloqu",
+    "ətir filter",
+    "brendə görə ətir",
+    "nota görə ətir",
+    "ətir qiymətləri",
+    "ətir seçimi",
+  ]),
+  alternates: {
+    canonical: "/catalog",
+  },
+};
 
 type CatalogPageProps = {
   searchParams: Promise<{ brand?: string }>;

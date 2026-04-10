@@ -1,7 +1,17 @@
+import type { Metadata } from "next";
+
 import { Footer } from "@/components/Footer";
 import { AccountClient } from "@/components/account/AccountClient";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
+
+export const metadata: Metadata = {
+  title: "Hesabım",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export default async function AccountPage() {
   const locale = await getCurrentLocale();

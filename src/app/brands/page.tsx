@@ -1,9 +1,27 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 
 import { Footer } from "@/components/Footer";
 import { getPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
+import { buildAzeriPageKeywords } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Ətir Brendləri",
+  description:
+    "Perfoumer-də təqdim olunan ətir brendlərini əlifba sırası ilə kəşf edin və seçdiyiniz brend üzrə bütün məhsullara keçid edin.",
+  keywords: buildAzeriPageKeywords([
+    "ətir brendləri",
+    "məşhur ətir markaları",
+    "dizayner ətir markaları",
+    "niş ətir brendləri",
+    "brendə görə ətir seç",
+  ]),
+  alternates: {
+    canonical: "/brands",
+  },
+};
 
 function groupBrands(brands: string[]) {
   const grouped = new Map<string, string[]>();

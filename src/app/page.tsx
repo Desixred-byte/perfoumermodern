@@ -1,10 +1,28 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
 import { ProductCard } from "@/components/ProductCard";
 import { getFeaturedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { buildAzeriPageKeywords } from "@/lib/seo";
+
+export const metadata: Metadata = {
+  title: "Onlayn Ətir Mağazası",
+  description:
+    "Kişi və qadın üçün orijinal premium ətirləri kəşf edin. Niş və dizayner kolleksiyaları, seçilmiş notlar və sürətli sifariş prosesi.",
+  keywords: buildAzeriPageKeywords([
+    "onlayn ətir mağazası",
+    "orijinal ətir sifarişi",
+    "kişi və qadın ətirləri",
+    "premium parfum",
+    "niş ətir azərbaycan",
+  ]),
+  alternates: {
+    canonical: "/",
+  },
+};
 
 type AboutCopy = {
   eyebrow: string;

@@ -1,8 +1,11 @@
+import type { Metadata } from "next";
+
 import { Footer } from "@/components/Footer";
 import { NoteTypeCatalogSection } from "@/components/NoteTypeCatalogSection";
 import { getNotes, getPerfumes } from "@/lib/catalog";
 import { formatMessage, getDictionary } from "@/lib/i18n";
 import { getCurrentLocale } from "@/lib/i18n.server";
+import { absoluteUrl, buildAzeriPageKeywords } from "@/lib/seo";
 
 type NoteFilterType = "top" | "heart" | "base";
 
@@ -36,6 +39,39 @@ function decodeSlug(slug: string) {
 export async function generateStaticParams() {
   const notes = await getNotes();
   return notes.map((note) => ({ slug: note.slug }));
+}
+
+export async function generateMetadata({ params }: NotePageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const normalizedSlug = decodeSlug(slug).toLowerCase();
+  const notes = await getNotes();
+  const noteName =
+    notes.find((item) => item.slug === normalizedSlug)?.name ?? fallbackNoteName(normalizedSlug);
+  const canonicalPath = `/notes/${normalizedSlug}`;
+
+  return {
+    title: `${noteName} notu olan ətirlər`,
+    description: `${noteName} notu ilə seçilmiş premium ətirləri kəşf edin və top, ürək, baza notlarına görə filtr edin.`,
+    keywords: buildAzeriPageKeywords([
+      `${noteName} notu`,
+      `${noteName} qoxusu olan ətirlər`,
+      `${noteName} ətir notları`,
+      `${noteName} ətir tövsiyəsi`,
+      "top not ətirlər",
+      "ürək not ətirlər",
+      "baza not ətirlər",
+      "nota görə ətir seçimi",
+    ]),
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title: `${noteName} notu olan ətirlər`,
+      description: `${noteName} notuna uyğun ətir seçimi və not tipinə görə çeşidlənmiş məhsullar.`,
+      url: absoluteUrl(canonicalPath),
+      type: "website",
+    },
+  };
 }
 
 function fallbackNoteName(slug: string) {

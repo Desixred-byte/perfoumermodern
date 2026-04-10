@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { Storefront, User } from "@phosphor-icons/react/dist/ssr";
 
@@ -15,6 +16,7 @@ import { PerfumeWishlistButton } from "@/components/community/PerfumeWishlistBut
 import { getPerfumeBySlug, getPerfumes, getRelatedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
+import { absoluteUrl, buildAzeriPageKeywords } from "@/lib/seo";
 import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
 
 type PerfumeDetailPageProps = {
@@ -24,6 +26,56 @@ type PerfumeDetailPageProps = {
 export async function generateStaticParams() {
   const perfumes = await getPerfumes();
   return perfumes.map((perfume) => ({ slug: perfume.slug }));
+}
+
+export async function generateMetadata({
+  params,
+}: PerfumeDetailPageProps): Promise<Metadata> {
+  const { slug } = await params;
+  const perfume = await getPerfumeBySlug(slug);
+
+  if (!perfume) {
+    return {
+      title: "Məhsul tapılmadı",
+      robots: {
+        index: false,
+        follow: false,
+      },
+    };
+  }
+
+  const canonicalPath = `/perfumes/${perfume.slug}`;
+  return {
+    title: `${perfume.name} - ${perfume.brand}`,
+    description: `${perfume.brand} ${perfume.name} ətiri: ${perfume.gender} üçün notlar, ölçülər və qiymətlər.`,
+    keywords: buildAzeriPageKeywords([
+      `${perfume.name} ətri`,
+      `${perfume.brand} ətri`,
+      `${perfume.brand} parfum`,
+      `${perfume.gender} ətri`,
+      `${perfume.name} qiyməti`,
+      `${perfume.name} notları`,
+      "ətir ölçüləri",
+      "ətir sifarişi",
+    ]),
+    alternates: {
+      canonical: canonicalPath,
+    },
+    openGraph: {
+      title: `${perfume.name} - ${perfume.brand}`,
+      description: `${perfume.brand} ${perfume.name} ətiri üçün notlar, ölçülər və qiymətlər.`,
+      url: absoluteUrl(canonicalPath),
+      images: perfume.image
+        ? [
+            {
+              url: perfume.image,
+              alt: perfume.imageAlt || perfume.name,
+            },
+          ]
+        : undefined,
+      type: "website",
+    },
+  };
 }
 
 export default async function PerfumeDetailPage({

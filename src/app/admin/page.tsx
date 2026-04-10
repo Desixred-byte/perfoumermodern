@@ -1,6 +1,16 @@
+import type { Metadata } from "next";
+
 import { AdminPanelClient } from "@/components/admin/AdminPanelClient";
 import { isAdminAuthenticated, isAdminConfigured } from "@/lib/admin-auth";
 import { getAdminData } from "@/lib/admin-data";
+
+export const metadata: Metadata = {
+  title: "Admin",
+  robots: {
+    index: false,
+    follow: false,
+  },
+};
 
 export const dynamic = "force-dynamic";
 
