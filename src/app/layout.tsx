@@ -94,6 +94,9 @@ export const metadata: Metadata = {
       "Perfoumer-də orijinal və uzunömürlü kişi və qadın ətirlərini kəşf edin. Lüks, niş və dizayner brendləri, sürətli çatdırılma və xüsusi kolleksiyalar - hamısı bir onlayn ətir mağazasında.",
     images: [DEFAULT_OG_IMAGE],
   },
+  other: {
+    thumbnail: absoluteUrl(DEFAULT_OG_IMAGE),
+  },
   manifest: "/manifest.webmanifest",
 };
 

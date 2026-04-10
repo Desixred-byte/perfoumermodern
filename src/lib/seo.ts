@@ -9,7 +9,7 @@ export const SITE_URL = normalizeSiteUrl(
 );
 
 export const SITE_NAME = "Perfoumer";
-export const DEFAULT_OG_IMAGE = "/logo.webp";
+export const DEFAULT_OG_IMAGE = "/perfoumerlogo.png";
 
 const AZ_INTENTS = [
   "al",

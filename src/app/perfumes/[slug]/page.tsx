@@ -45,6 +45,7 @@ export async function generateMetadata({
   }
 
   const canonicalPath = `/perfumes/${perfume.slug}`;
+  const perfumePreviewImage = perfume.image || absoluteUrl("/perfoumerlogo.png");
   return {
     title: `${perfume.name} - ${perfume.brand}`,
     description: `${perfume.brand} ${perfume.name} ətiri: ${perfume.gender} üçün notlar, ölçülər və qiymətlər.`,
@@ -65,15 +66,19 @@ export async function generateMetadata({
       title: `${perfume.name} - ${perfume.brand}`,
       description: `${perfume.brand} ${perfume.name} ətiri üçün notlar, ölçülər və qiymətlər.`,
       url: absoluteUrl(canonicalPath),
-      images: perfume.image
-        ? [
-            {
-              url: perfume.image,
-              alt: perfume.imageAlt || perfume.name,
-            },
-          ]
-        : undefined,
+      images: [
+        {
+          url: perfumePreviewImage,
+          alt: perfume.imageAlt || perfume.name,
+        },
+      ],
       type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${perfume.name} - ${perfume.brand}`,
+      description: `${perfume.brand} ${perfume.name} ətiri üçün notlar, ölçülər və qiymətlər.`,
+      images: [perfumePreviewImage],
     },
   };
 }

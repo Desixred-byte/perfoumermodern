@@ -792,8 +792,24 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           className="mt-3 overflow-hidden transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
         >
           <div ref={questionCardInnerRef} className="py-1 sm:py-2">
-            <h2 className="text-[1.85rem] leading-tight text-zinc-900 sm:text-[2rem]">{currentQuestion.title}</h2>
-            <p className="mt-1.5 text-[0.95rem] text-zinc-500 sm:text-base">{currentQuestion.description}</p>
+            <h2
+              className={[
+                "leading-tight text-zinc-900",
+                currentQuestion.kind === "text"
+                  ? "text-[1.95rem] tracking-[-0.02em] sm:text-[2.15rem]"
+                  : "text-[1.85rem] sm:text-[2rem]",
+              ].join(" ")}
+            >
+              {currentQuestion.title}
+            </h2>
+            <p
+              className={[
+                "mt-1.5 text-zinc-500",
+                currentQuestion.kind === "text" ? "text-[1rem] sm:text-[1.04rem]" : "text-[0.95rem] sm:text-base",
+              ].join(" ")}
+            >
+              {currentQuestion.description}
+            </p>
 
             {currentQuestion.kind === "choice" ? (
               <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
@@ -821,21 +837,25 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                 })}
               </div>
             ) : (
-              <label className="mt-3 block">
-                <span className="mb-1.5 block text-sm text-zinc-700">{currentQuestion.label}</span>
-                <textarea
-                  value={textAnswers[currentQuestion.key]}
-                  onChange={(event) =>
-                    setTextAnswers((prev) => ({
-                      ...prev,
-                      [currentQuestion.key]: event.target.value,
-                    }))
-                  }
-                  rows={4}
-                  placeholder={currentQuestion.placeholder}
-                  className="w-full resize-none rounded-2xl bg-[#f7f7f6] px-4 py-3 text-sm text-zinc-800 outline-none ring-1 ring-zinc-200 transition focus:bg-white focus:ring-zinc-300"
-                />
-              </label>
+              <div className="mt-3 rounded-[1.35rem] border border-zinc-200/85 bg-[linear-gradient(160deg,rgba(255,255,255,0.96)_0%,rgba(248,248,246,0.92)_100%)] p-3 shadow-[0_12px_30px_rgba(20,20,22,0.05)] sm:p-4">
+                <label className="block">
+                  <span className="mb-2 block text-[0.72rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
+                    {currentQuestion.label}
+                  </span>
+                  <textarea
+                    value={textAnswers[currentQuestion.key]}
+                    onChange={(event) =>
+                      setTextAnswers((prev) => ({
+                        ...prev,
+                        [currentQuestion.key]: event.target.value,
+                      }))
+                    }
+                    rows={4}
+                    placeholder={currentQuestion.placeholder}
+                    className="w-full resize-none rounded-2xl border border-zinc-200/80 bg-white/95 px-4 py-3.5 text-sm leading-relaxed text-zinc-800 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-all duration-300 placeholder:text-zinc-400 focus:-translate-y-[1px] focus:border-zinc-300 focus:shadow-[0_14px_26px_rgba(20,20,22,0.08)]"
+                  />
+                </label>
+              </div>
             )}
 
             <div className="mt-4 flex flex-wrap items-center gap-2.5 sm:gap-3">
