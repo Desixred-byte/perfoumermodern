@@ -160,7 +160,7 @@ export default async function PerfumeDetailPage({
               </span>
             </p>
 
-            <div className="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,249,246,0.94)_100%)] shadow-[0_16px_38px_rgba(24,24,24,0.05)] ring-1 ring-zinc-200/80 md:rounded-[1.9rem] md:shadow-[0_22px_54px_rgba(24,24,24,0.06)]">
+            <div className="overflow-hidden rounded-[1.95rem] bg-white/96 shadow-[0_20px_54px_rgba(24,24,24,0.05)] ring-1 ring-zinc-200/80 md:shadow-[0_22px_54px_rgba(24,24,24,0.06)]">
               <div className="flex items-center justify-between border-b border-zinc-200/70 px-4 py-3.5 md:px-6 md:py-4">
                 <p className="text-[0.78rem] font-medium tracking-[0.24em] text-zinc-400 uppercase">
                   {t.detail.sizePrice}
@@ -171,17 +171,26 @@ export default async function PerfumeDetailPage({
                 perfume.sizes.map((size) => (
                   <div
                     key={size.label}
-                    className="group flex items-center gap-3 border-b border-zinc-200/55 px-3.5 py-3.5 last:border-b-0 md:gap-4 md:px-6 md:py-4"
+                    className="group flex items-center gap-0 border-b border-zinc-200/55 px-3.5 py-3.5 last:border-b-0 md:gap-0.5 md:px-6 md:py-4"
                   >
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.85rem] bg-white shadow-[0_8px_16px_rgba(24,24,24,0.05)] ring-1 ring-zinc-200/80 md:h-15 md:w-15 md:rounded-[1.1rem] md:shadow-[0_10px_22px_rgba(24,24,24,0.06)]">
-                      <Image
-                        src={perfume.image}
-                        alt={perfume.imageAlt || perfume.name}
-                        width={50}
-                        height={50}
-                        className="h-8 w-8 object-contain transition-transform duration-300 md:h-12 md:w-12 md:group-hover:scale-[1.03]"
-                      />
-                    </div>
+                    {(() => {
+                      const sizeImage =
+                        size.ml === 15
+                          ? "/15mlperfoumer.png"
+                          : size.ml === 30 || size.ml === 50
+                            ? "/30mlperfoumer.png"
+                            : "/perfoumerjar.png";
+
+                      return (
+                        <Image
+                          src={sizeImage}
+                          alt="Perfoumer"
+                          width={56}
+                          height={56}
+                          className="h-10 w-10 shrink-0 object-contain drop-shadow-[0_8px_14px_rgba(24,24,24,0.16)] transition-transform duration-300 md:h-14 md:w-14 md:group-hover:scale-[1.03]"
+                        />
+                      );
+                    })()}
                     <div className="min-w-0 flex-1">
                       <p className="text-[1.03rem] tracking-[-0.01em] text-zinc-800 md:text-[1.24rem] md:tracking-[-0.02em]">
                         <span className="font-semibold md:font-medium">{size.ml}</span>
@@ -191,7 +200,7 @@ export default async function PerfumeDetailPage({
                         {t.detail.premiumSize}
                       </p>
                     </div>
-                    <div className="ml-auto rounded-[0.95rem] border border-zinc-200/80 bg-white/80 px-2.5 py-1.5 text-right shadow-[0_6px_14px_rgba(24,24,24,0.04)] md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none">
+                    <div className="ml-auto rounded-[0.95rem] border border-zinc-200/80 bg-zinc-50/80 px-2.5 py-1.5 text-right shadow-[0_6px_14px_rgba(24,24,24,0.04)] md:rounded-none md:border-0 md:bg-transparent md:px-0 md:py-0 md:shadow-none">
                       <p className="stat-value text-[1.34rem] leading-none tracking-[-0.025em] text-zinc-900 md:text-[2.2rem] md:tracking-[-0.04em]">
                         {size.price}
                         <span className="ml-1 text-[0.78em] text-zinc-700">₼</span>

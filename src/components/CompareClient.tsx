@@ -534,7 +534,7 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
         <section className="px-1 text-sm text-zinc-600">{copy.compareHint}</section>
       ) : (
         <>
-          <section className="rounded-[1.45rem] border border-zinc-200/85 bg-[linear-gradient(160deg,rgba(255,255,255,0.96)_0%,rgba(247,247,245,0.9)_100%)] p-5 shadow-[0_10px_24px_rgba(20,20,20,0.05)]">
+          <section className="rounded-[1.95rem] border border-zinc-200/85 bg-white/96 p-5 shadow-[0_20px_54px_rgba(24,24,24,0.05)]">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-[0.72rem] font-semibold tracking-[0.15em] text-zinc-500 uppercase">
                 {copy.aiSummaryTitle}
