@@ -2,6 +2,7 @@ export type CommentRow = {
   id: string;
   user_id: string;
   username: string;
+  avatar_url?: string | null;
   user_email?: string | null;
   perfume_slug: string;
   rating: number;

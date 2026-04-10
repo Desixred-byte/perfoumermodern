@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
 				hostname: "perfoumer-cdn.vercel.app",
 				pathname: "/perfumes/**",
 			},
+			{
+				protocol: "https",
+				hostname: "framerusercontent.com",
+				pathname: "/images/**",
+			},
 		],
 	},
 	async redirects() {

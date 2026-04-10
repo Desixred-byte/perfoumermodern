@@ -14,6 +14,7 @@ import { ScrollToTopOnMount } from "@/components/ScrollToTopOnMount";
 import { PerfumeCommentsSection } from "@/components/community/PerfumeCommentsSection";
 import { PerfumeScentSummaryPanel } from "@/components/community/PerfumeScentSummaryPanel";
 import { PerfumeWishlistButton } from "@/components/community/PerfumeWishlistButton";
+import { PerfumeHeroCover } from "@/components/perfume/PerfumeHeroCover";
 import { getPerfumeBySlug, getPerfumes, getRelatedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
@@ -120,17 +121,7 @@ export default async function PerfumeDetailPage({
       <div className="mx-auto max-w-[1540px] px-6 md:px-10">
         <div className="grid gap-8 xl:grid-cols-[0.98fr_1fr] xl:gap-12 xl:items-start">
           <div className="self-start xl:sticky xl:top-32">
-            <div className="rounded-[2.15rem] bg-[linear-gradient(180deg,#f0f0ee_0%,#e4e4df_100%)] p-8 shadow-[0_24px_70px_rgba(24,24,24,0.08)] ring-1 ring-white/70 md:p-12 xl:flex xl:h-[calc(100vh-10rem)] xl:items-center xl:justify-center">
-              <Image
-                src={perfume.image}
-                alt={perfume.imageAlt || perfume.name}
-                width={900}
-                height={1200}
-                priority
-                sizes="(max-width: 767px) 82vw, (max-width: 1279px) 72vw, 38vw"
-                className="mx-auto h-[420px] w-auto max-w-full object-contain drop-shadow-[0_28px_42px_rgba(0,0,0,0.18)] md:h-[560px] xl:h-[min(70vh,640px)] xl:max-w-[74%]"
-              />
-            </div>
+            <PerfumeHeroCover src={perfume.image} alt={perfume.imageAlt || perfume.name} />
           </div>
 
           <div className="space-y-6 xl:pt-2">

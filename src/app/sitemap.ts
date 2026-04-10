@@ -32,6 +32,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.7,
     },
+    {
+      url: absoluteUrl("/compare"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.72,
+    },
   ];
 
   const perfumeRoutes: MetadataRoute.Sitemap = perfumes.map((perfume) => ({

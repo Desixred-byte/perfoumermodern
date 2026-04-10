@@ -5,13 +5,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  Camera,
+  ChatCircleDots,
   CircleNotch,
   CheckCircle,
   DotsThreeOutlineVertical,
   EnvelopeSimple,
+  Heart,
   Info,
   PencilSimple,
   SignOut,
+  Trash,
   UserCircle,
   WarningCircle,
   X,
@@ -62,15 +66,100 @@ type Copy = {
   invalidUsername: string;
   configMissing: string;
   profileSaved: string;
+  avatarSection: string;
+  uploadAvatar: string;
+  avatarHint: string;
+  avatarUploading: string;
+  avatarModerating: string;
+  avatarSaved: string;
+  avatarRejected: string;
+  avatarRejectedReasonPrefix: string;
+  avatarRejectedReasonUnknown: string;
+  avatarScanFailed: string;
+  avatarTooLarge: string;
+  avatarInvalidType: string;
   emailCodeSent: string;
   emailVerified: string;
   emailPendingSecondVerification: string;
   sameEmailError: string;
   genericError: string;
+  commentsSection: string;
+  commentsSubtitle: string;
+  commentsLoading: string;
+  commentsEmpty: string;
+  commentsLoadFailed: string;
+  commentsCountLabel: string;
+  commentsOnPerfumeLabel: string;
+  commentsPostedLabel: string;
+  commentsRatingLabel: string;
+  commentsDelete: string;
+  commentsDeleting: string;
+  commentsDeleteTitle: string;
+  commentsDeleteAction: string;
+  commentsDeleteConfirm: string;
+  commentsDeleteSuccess: string;
+  commentsDeleteFailed: string;
 };
 
 const OTP_LENGTH = 8;
 const OTP_EXPIRES_SECONDS = 3600;
+const MAX_AVATAR_BYTES = 4 * 1024 * 1024;
+
+const getAvatarUrlFromMetadata = (metadata: unknown) => {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const value = (metadata as Record<string, unknown>).avatar_url;
+  return typeof value === "string" ? value.trim() : "";
+};
+
+const extractAvatarStoragePath = (publicUrl: string, supabaseUrl: string) => {
+  const prefix = `${supabaseUrl.replace(/\/$/, "")}/storage/v1/object/public/avatars/`;
+  if (!publicUrl.startsWith(prefix)) {
+    return "";
+  }
+
+  return decodeURIComponent(publicUrl.slice(prefix.length));
+};
+
+const MODERATION_REASON_LABELS: Record<string, string> = {
+  sexual: "sexual content",
+  "sexual/minors": "sexual content involving minors",
+  "violence/graphic": "graphic violence",
+  "self-harm/intent": "self-harm intent",
+  "self-harm/instructions": "self-harm instructions",
+};
+
+const formatModerationReason = (reason: string) => {
+  const normalized = reason.trim().toLowerCase();
+  if (!normalized) {
+    return "";
+  }
+
+  return MODERATION_REASON_LABELS[normalized] ?? normalized.replaceAll("/", " / ").replaceAll("_", " ");
+};
+
+type AccountCommentHistoryItem = {
+  id: string;
+  perfume_slug: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+};
+
+const LOCALE_DATE_FORMAT = {
+  az: "az-AZ",
+  en: "en-US",
+  ru: "ru-RU",
+} as const;
+
+const formatPerfumeSlugLabel = (value: string) =>
+  value
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
 
 const copyByLocale: Record<Locale, Copy> = {
   az: {
@@ -105,12 +194,40 @@ const copyByLocale: Record<Locale, Copy> = {
     invalidUsername: "İstifadəçi adı ən azı 3 simvol olmalıdır.",
     configMissing: "Supabase konfiqurasiyası yoxdur.",
     profileSaved: "Profil məlumatları yeniləndi.",
+    avatarSection: "Profil şəkli",
+    uploadAvatar: "Şəkil yüklə",
+    avatarHint: "PNG, JPG və WEBP. Maksimum 4MB.",
+    avatarUploading: "Şəkil yüklənir...",
+    avatarModerating: "Şəkil yoxlanılır...",
+    avatarSaved: "Profil şəkli yeniləndi.",
+    avatarRejected: "Profil şəkli uyğun deyil. Zəhmət olmasa başqa şəkil seçin.",
+    avatarRejectedReasonPrefix: "Rədd edilmə səbəbi",
+    avatarRejectedReasonUnknown: "Naməlum səbəb",
+    avatarScanFailed: "Şəkil yoxlaması hazır deyil. Bir az sonra yenidən yoxlayın.",
+    avatarTooLarge: "Şəkil 4MB-dan böyük ola bilməz.",
+    avatarInvalidType: "Yalnız şəkil faylları yükləmək olar.",
     emailCodeSent: "Yeni email üçün təsdiq kodu göndərildi.",
     emailVerified: "Email ünvanı təsdiqləndi və yeniləndi.",
     emailPendingSecondVerification:
       "Kod qəbul edildi, amma email hələ dəyişməyib. Köhnə emailə gələn təsdiqi də tamamla və ya Auth ayarlarında “Secure email change” funksiyasını söndür.",
     sameEmailError: "Yeni email cari email ilə eyni ola bilməz.",
     genericError: "Xəta baş verdi. Yenidən cəhd edin.",
+    commentsSection: "Şərh tarixçəm",
+    commentsSubtitle: "Profilinizdən yazdığınız bütün rəylər bir yerdə.",
+    commentsLoading: "Şərhlər yüklənir...",
+    commentsEmpty: "Hələ şərh yazmamısınız.",
+    commentsLoadFailed: "Şərhləri yükləmək olmadı. Bir az sonra yenidən cəhd edin.",
+    commentsCountLabel: "şərh",
+    commentsOnPerfumeLabel: "Ətir",
+    commentsPostedLabel: "Tarix",
+    commentsRatingLabel: "Reytinq",
+    commentsDelete: "Sil",
+    commentsDeleting: "Silinir...",
+    commentsDeleteTitle: "Şərhi sil",
+    commentsDeleteAction: "Bəli, sil",
+    commentsDeleteConfirm: "Bu şərhi silmək istədiyinizə əminsiniz?",
+    commentsDeleteSuccess: "Şərh silindi.",
+    commentsDeleteFailed: "Şərhi silmək mümkün olmadı.",
   },
   en: {
     title: "My Account",
@@ -144,12 +261,40 @@ const copyByLocale: Record<Locale, Copy> = {
     invalidUsername: "Username must be at least 3 characters.",
     configMissing: "Supabase configuration is missing.",
     profileSaved: "Profile details updated.",
+    avatarSection: "Profile photo",
+    uploadAvatar: "Upload photo",
+    avatarHint: "PNG, JPG, or WEBP. Max 4MB.",
+    avatarUploading: "Uploading photo...",
+    avatarModerating: "Scanning photo...",
+    avatarSaved: "Profile photo updated.",
+    avatarRejected: "Photo is not allowed. Please choose a different one.",
+    avatarRejectedReasonPrefix: "Denial reason",
+    avatarRejectedReasonUnknown: "Unknown reason",
+    avatarScanFailed: "Photo scan is unavailable right now. Please try again.",
+    avatarTooLarge: "Photo must be 4MB or smaller.",
+    avatarInvalidType: "Only image files are allowed.",
     emailCodeSent: "A verification code was sent to your new email.",
     emailVerified: "Email address verified and updated.",
     emailPendingSecondVerification:
       "Code accepted, but email is still unchanged. Confirm from the old email too, or disable “Secure email change” in Auth settings.",
     sameEmailError: "New email cannot be the same as your current email.",
     genericError: "Something went wrong. Please try again.",
+    commentsSection: "My Comment History",
+    commentsSubtitle: "All reviews you posted from your profile, in one place.",
+    commentsLoading: "Loading your comments...",
+    commentsEmpty: "You have not posted any comments yet.",
+    commentsLoadFailed: "Could not load your comments right now. Please try again.",
+    commentsCountLabel: "comments",
+    commentsOnPerfumeLabel: "Perfume",
+    commentsPostedLabel: "Posted",
+    commentsRatingLabel: "Rating",
+    commentsDelete: "Delete",
+    commentsDeleting: "Deleting...",
+    commentsDeleteTitle: "Delete comment",
+    commentsDeleteAction: "Yes, delete",
+    commentsDeleteConfirm: "Are you sure you want to delete this comment?",
+    commentsDeleteSuccess: "Comment deleted.",
+    commentsDeleteFailed: "Could not delete comment.",
   },
   ru: {
     title: "Мой аккаунт",
@@ -183,12 +328,40 @@ const copyByLocale: Record<Locale, Copy> = {
     invalidUsername: "Имя пользователя должно быть не короче 3 символов.",
     configMissing: "Конфигурация Supabase отсутствует.",
     profileSaved: "Данные профиля обновлены.",
+    avatarSection: "Фото профиля",
+    uploadAvatar: "Загрузить фото",
+    avatarHint: "PNG, JPG или WEBP. Максимум 4MB.",
+    avatarUploading: "Загрузка фото...",
+    avatarModerating: "Проверка фото...",
+    avatarSaved: "Фото профиля обновлено.",
+    avatarRejected: "Фото не прошло проверку. Выберите другое изображение.",
+    avatarRejectedReasonPrefix: "Причина отклонения",
+    avatarRejectedReasonUnknown: "Неизвестная причина",
+    avatarScanFailed: "Проверка фото сейчас недоступна. Попробуйте позже.",
+    avatarTooLarge: "Фото должно быть не больше 4MB.",
+    avatarInvalidType: "Разрешены только файлы изображений.",
     emailCodeSent: "Код подтверждения отправлен на новый email.",
     emailVerified: "Email подтвержден и обновлен.",
     emailPendingSecondVerification:
       "Код принят, но email пока не изменился. Подтвердите также через старый email или отключите “Secure email change” в настройках Auth.",
     sameEmailError: "Новый email не может совпадать с текущим.",
     genericError: "Произошла ошибка. Попробуйте снова.",
+    commentsSection: "История моих комментариев",
+    commentsSubtitle: "Все отзывы, которые вы оставили из своего профиля.",
+    commentsLoading: "Загружаем ваши комментарии...",
+    commentsEmpty: "Вы еще не оставили ни одного комментария.",
+    commentsLoadFailed: "Не удалось загрузить комментарии. Попробуйте позже.",
+    commentsCountLabel: "комментариев",
+    commentsOnPerfumeLabel: "Аромат",
+    commentsPostedLabel: "Дата",
+    commentsRatingLabel: "Рейтинг",
+    commentsDelete: "Удалить",
+    commentsDeleting: "Удаление...",
+    commentsDeleteTitle: "Удалить комментарий",
+    commentsDeleteAction: "Да, удалить",
+    commentsDeleteConfirm: "Вы уверены, что хотите удалить этот комментарий?",
+    commentsDeleteSuccess: "Комментарий удален.",
+    commentsDeleteFailed: "Не удалось удалить комментарий.",
   },
 };
 
@@ -202,11 +375,20 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
   const [initialUsername, setInitialUsername] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [notice, setNotice] = useState<{ text: string; tone: NoticeTone } | null>(null);
   const [isBusy, setIsBusy] = useState(false);
+  const [isAvatarBusy, setIsAvatarBusy] = useState(false);
+  const [isAvatarScanning, setIsAvatarScanning] = useState(false);
+  const [avatarModerationIssue, setAvatarModerationIssue] = useState("");
+  const [commentHistory, setCommentHistory] = useState<AccountCommentHistoryItem[]>([]);
+  const [isCommentHistoryLoading, setIsCommentHistoryLoading] = useState(false);
+  const [commentHistoryError, setCommentHistoryError] = useState("");
+  const [deletingHistoryCommentId, setDeletingHistoryCommentId] = useState("");
+  const [pendingDeleteHistoryCommentId, setPendingDeleteHistoryCommentId] = useState("");
   const [profileAction, setProfileAction] = useState<{ phase: ActionPhase; text: string }>({
     phase: "idle",
     text: "",
@@ -244,12 +426,14 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         typeof session.user.user_metadata?.username === "string"
           ? session.user.user_metadata.username
           : "";
+      const metadataAvatar = getAvatarUrlFromMetadata(session.user.user_metadata);
       const fallbackUsername = (session.user.email ?? "").split("@")[0] ?? "";
 
       setUserId(session.user.id);
       setEmail(session.user.email ?? "");
       setUsername(metadataUsername || fallbackUsername);
       setInitialUsername(metadataUsername || fallbackUsername);
+      setAvatarUrl(metadataAvatar);
       setIsReady(true);
     });
   }, [supabase]);
@@ -324,12 +508,16 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
   }, []);
 
   useEffect(() => {
-    if (!isLogoutConfirmOpen) {
+    if (!isLogoutConfirmOpen && !pendingDeleteHistoryCommentId) {
       return;
     }
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (pendingDeleteHistoryCommentId) {
+          setPendingDeleteHistoryCommentId("");
+          return;
+        }
         setIsLogoutConfirmOpen(false);
       }
     };
@@ -338,7 +526,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
     return () => {
       window.removeEventListener("keydown", handleEscape);
     };
-  }, [isLogoutConfirmOpen]);
+  }, [isLogoutConfirmOpen, pendingDeleteHistoryCommentId]);
 
   useEffect(() => {
     return () => {
@@ -350,6 +538,56 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!supabase || !userId) {
+      setCommentHistory([]);
+      setCommentHistoryError("");
+      setIsCommentHistoryLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+    setIsCommentHistoryLoading(true);
+    setCommentHistoryError("");
+
+    supabase
+      .from("comments")
+      .select("id,perfume_slug,rating,comment,created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50)
+      .then(({ data, error }) => {
+        if (!isMounted) {
+          return;
+        }
+
+        if (error) {
+          setCommentHistoryError(copy.commentsLoadFailed);
+          setCommentHistory([]);
+          setIsCommentHistoryLoading(false);
+          return;
+        }
+
+        const parsed = (data ?? [])
+          .filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+          .map((item) => ({
+            id: String(item.id ?? ""),
+            perfume_slug: String(item.perfume_slug ?? "").trim().toLowerCase(),
+            rating: Number(item.rating ?? 0),
+            comment: String(item.comment ?? "").trim(),
+            created_at: String(item.created_at ?? ""),
+          }))
+          .filter((item) => item.id && item.perfume_slug && item.comment);
+
+        setCommentHistory(parsed);
+        setIsCommentHistoryLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [copy.commentsLoadFailed, supabase, userId]);
 
   const saveProfile = async () => {
     if (!supabase) return;
@@ -397,6 +635,144 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
     scheduleProfileActionReset(3200);
     setInitialUsername(normalizedUsername);
     setIsBusy(false);
+  };
+
+  const uploadAvatar = async (file: File) => {
+    if (!supabase) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      showNotice(copy.avatarInvalidType, "error");
+      return;
+    }
+
+    if (file.size > MAX_AVATAR_BYTES) {
+      showNotice(copy.avatarTooLarge, "error");
+      return;
+    }
+
+    setIsAvatarBusy(true);
+    setIsAvatarScanning(false);
+    setAvatarModerationIssue("");
+    setNotice(null);
+    setProfileAction({ phase: "loading", text: copy.avatarUploading });
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData.session?.user;
+    const accessToken = sessionData.session?.access_token;
+
+    if (!user) {
+      showNotice(copy.loginRequiredTitle, "error");
+      setProfileAction({ phase: "error", text: copy.loginRequiredTitle });
+      setIsAvatarBusy(false);
+      setIsAvatarScanning(false);
+      return;
+    }
+
+    const extension = (file.name.split(".").pop() || "jpg").toLowerCase();
+    const safeExtension = /^[a-z0-9]{2,6}$/.test(extension) ? extension : "jpg";
+    const filePath = `${user.id}/avatar-${Date.now()}.${safeExtension}`;
+
+    const uploadResult = await supabase.storage
+      .from("avatars")
+      .upload(filePath, file, { upsert: true, contentType: file.type });
+
+    if (uploadResult.error) {
+      showNotice(uploadResult.error.message || copy.genericError, "error");
+      setProfileAction({ phase: "error", text: uploadResult.error.message || copy.genericError });
+      setIsAvatarBusy(false);
+      setIsAvatarScanning(false);
+      return;
+    }
+
+    const uploadedPublicUrl = supabase.storage.from("avatars").getPublicUrl(filePath).data.publicUrl;
+
+    setProfileAction({ phase: "loading", text: copy.avatarModerating });
+    setIsAvatarScanning(true);
+    const moderationResponse = await fetch("/api/profile/avatar-moderate", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+      },
+      body: JSON.stringify({ imageUrl: uploadedPublicUrl }),
+    });
+
+    const moderationPayload = (await moderationResponse.json().catch(() => ({}))) as {
+      allowed?: boolean;
+      error?: string;
+      reasons?: string[];
+    };
+
+    if (!moderationResponse.ok || moderationPayload.allowed !== true) {
+      setIsAvatarScanning(false);
+      await supabase.storage.from("avatars").remove([filePath]);
+
+      const moderationError = moderationPayload.error || "";
+      const isScanUnavailable = moderationError.includes("unavailable") || moderationError.includes("missing");
+      const firstReason = moderationPayload.reasons?.[0] || "";
+      const formattedReason = formatModerationReason(firstReason);
+      const moderationMessage = isScanUnavailable
+        ? copy.avatarScanFailed
+        : copy.avatarRejected;
+
+      showNotice(moderationMessage, "error");
+      setProfileAction({ phase: "error", text: moderationMessage });
+      if (isScanUnavailable) {
+        setAvatarModerationIssue("");
+      } else {
+        const moderationDetail = formattedReason || copy.avatarRejectedReasonUnknown;
+        setAvatarModerationIssue(`${copy.avatarRejectedReasonPrefix}: ${moderationDetail}`);
+      }
+      setIsAvatarBusy(false);
+      return;
+    }
+
+    setIsAvatarScanning(false);
+
+    const currentMetadata = user.user_metadata ?? {};
+    const previousAvatarUrl = getAvatarUrlFromMetadata(currentMetadata);
+
+    const { error: updateError } = await supabase.auth.updateUser({
+      data: {
+        ...currentMetadata,
+        avatar_url: uploadedPublicUrl,
+      },
+    });
+
+    if (updateError) {
+      showNotice(updateError.message || copy.genericError, "error");
+      setProfileAction({ phase: "error", text: updateError.message || copy.genericError });
+      setIsAvatarBusy(false);
+      setIsAvatarScanning(false);
+      return;
+    }
+
+    const commentsAvatarSync = await supabase
+      .from("comments")
+      .update({ avatar_url: uploadedPublicUrl })
+      .eq("user_id", user.id);
+
+    if (commentsAvatarSync.error?.message.toLowerCase().includes("avatar_url")) {
+      // Ignore environments where comments.avatar_url column is not present.
+    }
+
+    setAvatarUrl(uploadedPublicUrl);
+    setAvatarModerationIssue("");
+
+    if (supabaseConfig?.url && previousAvatarUrl && previousAvatarUrl !== uploadedPublicUrl) {
+      const previousPath = extractAvatarStoragePath(previousAvatarUrl, supabaseConfig.url);
+      if (previousPath) {
+        await supabase.storage.from("avatars").remove([previousPath]);
+      }
+    }
+
+    showNotice(copy.avatarSaved, "success");
+    setProfileAction({ phase: "success", text: copy.avatarSaved });
+    scheduleProfileActionReset(3200);
+    setIsAvatarBusy(false);
+    setIsAvatarScanning(false);
   };
 
   const sendEmailCode = async () => {
@@ -521,6 +897,40 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
     showNotice(copy.signedOut, "info", true);
     router.push("/login?next=%2Faccount");
     router.refresh();
+  };
+
+  const requestDeleteHistoryComment = (commentId: string) => {
+    if (!commentId) {
+      return;
+    }
+    setPendingDeleteHistoryCommentId(commentId);
+  };
+
+  const confirmDeleteHistoryComment = async () => {
+    const commentId = pendingDeleteHistoryCommentId;
+    if (!supabase || !userId || !commentId) {
+      setPendingDeleteHistoryCommentId("");
+      return;
+    }
+
+    setDeletingHistoryCommentId(commentId);
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", userId);
+
+    if (error) {
+      showNotice(copy.commentsDeleteFailed, "error");
+      setPendingDeleteHistoryCommentId("");
+      setDeletingHistoryCommentId("");
+      return;
+    }
+
+    setCommentHistory((prev) => prev.filter((item) => item.id !== commentId));
+    showNotice(copy.commentsDeleteSuccess, "success");
+    setPendingDeleteHistoryCommentId("");
+    setDeletingHistoryCommentId("");
   };
 
   const activateEditMode = (mode: "username" | "email") => {
@@ -662,6 +1072,61 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
             </div>
           </div>
         </div>
+        <div
+          className={`relative mt-4 flex items-center gap-4 overflow-hidden rounded-2xl bg-zinc-50 px-4 py-3 ring-1 transition-colors duration-300 ${
+            isAvatarScanning ? "ring-amber-300/90" : "ring-zinc-200/80"
+          }`}
+        >
+          {isAvatarScanning ? <span className="avatar-scan-shimmer" aria-hidden="true" /> : null}
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={copy.avatarSection}
+              className={`relative z-[1] h-16 w-16 rounded-full object-cover ring-1 ring-zinc-200 ${
+                isAvatarScanning ? "opacity-80" : ""
+              }`}
+            />
+          ) : (
+            <div
+              className={`relative z-[1] grid h-16 w-16 place-items-center rounded-full bg-zinc-200 text-lg font-semibold text-zinc-700 ${
+                isAvatarScanning ? "opacity-80" : ""
+              }`}
+            >
+              {normalizedUsername.slice(0, 1).toUpperCase() || "U"}
+            </div>
+          )}
+          <div className="relative z-[1] min-w-0 flex-1">
+            <p className="text-sm font-medium text-zinc-700">{copy.avatarSection}</p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {isAvatarScanning ? copy.avatarModerating : copy.avatarHint}
+            </p>
+            {avatarModerationIssue ? (
+              <p className="mt-1.5 inline-flex items-start gap-1.5 text-xs font-medium text-amber-700">
+                <WarningCircle size={14} weight="fill" className="mt-[1px] shrink-0 text-amber-500" />
+                {avatarModerationIssue}
+              </p>
+            ) : null}
+          </div>
+          <label className="relative z-[1] inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-100">
+            {isAvatarBusy ? <CircleNotch size={15} className="animate-spin" /> : <Camera size={15} />}
+            {copy.uploadAvatar}
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="sr-only"
+              disabled={isAvatarBusy || isBusy}
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) {
+                  return;
+                }
+                await uploadAvatar(file);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+        </div>
+
         <label className="mt-4 block">
           <span className="mb-1.5 block text-sm font-medium text-zinc-700">{copy.username}</span>
           <input
@@ -863,6 +1328,104 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         ) : null}
       </section>
 
+      <section className="rounded-[1.8rem] border border-zinc-200/80 bg-[linear-gradient(150deg,#ffffff_0%,#f6f6f4_100%)] p-7 shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold tracking-[0.12em] text-zinc-500 uppercase">{copy.commentsSection}</p>
+            <p className="mt-2 text-sm text-zinc-600">{copy.commentsSubtitle}</p>
+          </div>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300/80 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700">
+            <ChatCircleDots size={14} weight="duotone" />
+            {commentHistory.length} {copy.commentsCountLabel}
+          </span>
+        </div>
+
+        {isCommentHistoryLoading ? (
+          <div className="mt-5 space-y-3">
+            <p className="text-xs font-medium tracking-[0.08em] text-zinc-500 uppercase">{copy.commentsLoading}</p>
+            {[0, 1, 2].map((index) => (
+              <div
+                key={`comment-history-skeleton-${index}`}
+                className="rounded-2xl border border-zinc-200/90 bg-white/80 p-4 animate-pulse"
+              >
+                <div className="h-3 w-36 rounded-full bg-zinc-200" />
+                <div className="mt-3 h-3 w-full rounded-full bg-zinc-100" />
+                <div className="mt-2 h-3 w-3/4 rounded-full bg-zinc-100" />
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {!isCommentHistoryLoading && commentHistoryError ? (
+          <div className="mt-5 rounded-2xl border border-amber-200/90 bg-amber-50/90 px-4 py-3 text-sm font-medium text-amber-800">
+            {commentHistoryError}
+          </div>
+        ) : null}
+
+        {!isCommentHistoryLoading && !commentHistoryError && commentHistory.length === 0 ? (
+          <div className="mt-5 rounded-2xl border border-zinc-200/90 bg-white/80 px-4 py-4 text-sm text-zinc-600">
+            {copy.commentsEmpty}
+          </div>
+        ) : null}
+
+        {!isCommentHistoryLoading && !commentHistoryError && commentHistory.length > 0 ? (
+          <div className="mt-5 grid gap-3">
+            {commentHistory.map((item) => {
+              const safeRating = Math.max(0, Math.min(5, Math.round(item.rating)));
+              const postedOn = item.created_at
+                ? new Date(item.created_at).toLocaleDateString(LOCALE_DATE_FORMAT[locale], {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "-";
+
+              return (
+                <article
+                  key={item.id}
+                  className="group rounded-2xl border border-zinc-200/90 bg-white/90 px-4 py-4 transition-all duration-300 hover:-translate-y-[1px] hover:shadow-[0_12px_24px_rgba(20,20,20,0.08)]"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Link
+                      href={`/perfumes/${item.perfume_slug}`}
+                      className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-900 underline-offset-2 transition-colors duration-200 hover:text-zinc-700 hover:underline"
+                    >
+                      {copy.commentsOnPerfumeLabel}: {formatPerfumeSlugLabel(item.perfume_slug)}
+                    </Link>
+                    <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[11px] font-medium text-zinc-600">
+                      {copy.commentsPostedLabel}: {postedOn}
+                    </span>
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-zinc-700">{item.comment}</p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
+                      <Heart size={13} weight="fill" />
+                      {copy.commentsRatingLabel}: {safeRating}/5
+                    </span>
+                    <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[11px] text-zinc-500">
+                      {item.perfume_slug}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        requestDeleteHistoryComment(item.id);
+                      }}
+                      disabled={deletingHistoryCommentId === item.id}
+                      className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-colors duration-200 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Trash size={12} />
+                      {deletingHistoryCommentId === item.id ? copy.commentsDeleting : copy.commentsDelete}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : null}
+      </section>
+
       <section className="rounded-[1.8rem] bg-white p-7 shadow-[0_10px_32px_rgba(0,0,0,0.04)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_14px_36px_rgba(0,0,0,0.07)]">
         <button
           type="button"
@@ -940,6 +1503,43 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                 className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-zinc-800 sm:min-h-10 sm:w-auto"
               >
                 {copy.logoutConfirm}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )
+        : null}
+
+      {isDomReady && pendingDeleteHistoryCommentId
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[130] flex items-end justify-center bg-zinc-900/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4"
+          onClick={() => setPendingDeleteHistoryCommentId("")}
+        >
+          <div
+            className="w-full rounded-t-3xl border border-zinc-200 bg-white p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_28px_64px_rgba(18,18,18,0.24)] animate-[accountPopIn_320ms_cubic-bezier(0.22,1,0.36,1)] sm:max-w-md sm:rounded-3xl sm:pb-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-900">{copy.commentsDeleteTitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">{copy.commentsDeleteConfirm}</p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteHistoryCommentId("")}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-50 sm:min-h-10 sm:w-auto"
+              >
+                {copy.logoutCancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void confirmDeleteHistoryComment();
+                }}
+                disabled={deletingHistoryCommentId === pendingDeleteHistoryCommentId}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10 sm:w-auto"
+              >
+                {deletingHistoryCommentId === pendingDeleteHistoryCommentId ? copy.commentsDeleting : copy.commentsDeleteAction}
               </button>
             </div>
           </div>

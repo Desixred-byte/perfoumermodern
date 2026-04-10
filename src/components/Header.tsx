@@ -40,13 +40,16 @@ export function Header({ floating = false, locale }: HeaderProps) {
       wishlist: "Wishlist",
     },
   } as const;
-  const menuItems = [
+  const primaryMenuItems = [
     { href: "/", label: t.header.home },
-    { href: "/#about", label: t.header.about },
     { href: "/catalog", label: t.header.products },
-    ...(session ? [{ href: "/wishlist", label: copy[locale].wishlist }] : []),
+    { href: "/compare", label: t.header.compare },
     { href: "/qoxunu", label: t.header.scentQuiz },
+  ];
+  const secondaryMenuItems = [
+    ...(session ? [{ href: "/wishlist", label: copy[locale].wishlist }] : []),
     { href: "/brands", label: t.header.brands },
+    { href: "/#about", label: t.header.about },
     { href: "/#contact", label: t.header.contact },
   ];
   const loginHref = useMemo(() => {
@@ -244,14 +247,14 @@ export function Header({ floating = false, locale }: HeaderProps) {
 
           <div className="mt-6 md:mt-8">
             <nav className="flex w-full flex-col">
-              {menuItems.map((item, index) => (
+              {[...primaryMenuItems, ...secondaryMenuItems].map((item, index) => (
                 <Link
                   key={item.href}
                   href={item.href}
                   onClick={() => setIsMenuOpen(false)}
-                  style={{ transitionDelay: isMenuOpen ? `${120 + index * 65}ms` : "0ms" }}
+                  style={{ transitionDelay: isMenuOpen ? `${110 + index * 50}ms` : "0ms" }}
                   className={[
-                    "group flex w-full items-center gap-4 py-2 text-[1.95rem] leading-[1.08] font-medium text-zinc-700 sm:text-[3rem] md:py-2.5 md:text-[3.55rem]",
+                    "group flex w-full items-center gap-3 py-2 text-[1.85rem] leading-[1.08] font-medium text-zinc-700 sm:text-[2rem] md:py-2 md:text-[2.5rem]",
                     menuTransition,
                     isMenuOpen
                       ? "translate-y-0 opacity-100"
@@ -263,9 +266,9 @@ export function Header({ floating = false, locale }: HeaderProps) {
                     <span className="absolute inset-y-0 left-0 w-full origin-left scale-x-0 bg-zinc-500/80 transition-transform duration-300 ease-out group-hover:scale-x-100" />
                   </span>
                   <ArrowRight
-                    size={30}
+                    size={28}
                     weight="light"
-                    className="shrink-0 translate-x-[-8px] text-zinc-500 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+                    className="shrink-0 translate-x-[-6px] text-zinc-500 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100"
                   />
                 </Link>
               ))}
@@ -273,20 +276,25 @@ export function Header({ floating = false, locale }: HeaderProps) {
               <Link
                 href={session ? "/account" : loginHref}
                 onClick={() => setIsMenuOpen(false)}
+                style={{
+                  transitionDelay: isMenuOpen
+                    ? `${110 + (primaryMenuItems.length + secondaryMenuItems.length) * 50}ms`
+                    : "0ms",
+                }}
                 className={[
-                  "group mt-3 flex w-full items-center gap-4 py-2 text-[1.95rem] leading-[1.08] font-medium text-zinc-700 sm:text-[3rem] md:py-2.5 md:text-[3.55rem]",
+                  "group flex w-full items-center gap-3 py-2 text-[1.85rem] leading-[1.08] font-semibold text-zinc-800 sm:text-[2rem] md:py-2 md:text-[2.5rem]",
                   menuTransition,
                   isMenuOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0",
                 ].join(" ")}
               >
                 <span>{session ? copy[locale].account : copy[locale].login}</span>
                 <span className="relative h-px min-w-0 flex-1 overflow-hidden bg-zinc-300/70">
-                  <span className="absolute inset-y-0 left-0 w-full origin-left scale-x-0 bg-zinc-500/80 transition-transform duration-300 ease-out group-hover:scale-x-100" />
+                  <span className="absolute inset-y-0 left-0 w-full origin-left scale-x-0 bg-zinc-700/90 transition-transform duration-300 ease-out group-hover:scale-x-100" />
                 </span>
                 <ArrowRight
-                  size={30}
+                  size={28}
                   weight="light"
-                  className="shrink-0 translate-x-[-8px] text-zinc-500 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100"
+                  className="shrink-0 translate-x-[-6px] text-zinc-600 opacity-0 transition-all duration-300 ease-out group-hover:translate-x-0 group-hover:opacity-100"
                 />
               </Link>
             </nav>

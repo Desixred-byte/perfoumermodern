@@ -1,8 +1,9 @@
 "use client";
 
-import { ArrowRight, ChatCircleDots, Heart } from "@phosphor-icons/react";
+import { ArrowRight, CaretDown, ChatCircleDots, Heart, Trash } from "@phosphor-icons/react";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { createPortal } from "react-dom";
 import type { Session } from "@supabase/supabase-js";
 
 import { formatMessage, type Locale } from "@/lib/i18n";
@@ -48,6 +49,14 @@ type Copy = {
   alreadyReviewed: string;
   oneReviewOnly: string;
   configMissing: string;
+  deleteOwnComment: string;
+  deletingComment: string;
+  deleteCommentTitle: string;
+  deleteCommentCancel: string;
+  deleteCommentAction: string;
+  deleteCommentConfirm: string;
+  deleteCommentSuccess: string;
+  deleteCommentFailed: string;
 };
 
 const copyByLocale: Record<Locale, Copy> = {
@@ -83,6 +92,14 @@ const copyByLocale: Record<Locale, Copy> = {
     alreadyReviewed: "Bu məhsul üçün artıq rəy yazmısınız.",
     oneReviewOnly: "Hər istifadəçi bu məhsul üçün yalnız bir rəy paylaşa bilər.",
     configMissing: "Supabase konfiqurasiyası yoxdur.",
+    deleteOwnComment: "Sil",
+    deletingComment: "Silinir...",
+    deleteCommentTitle: "Rəyi sil",
+    deleteCommentCancel: "Ləğv et",
+    deleteCommentAction: "Bəli, sil",
+    deleteCommentConfirm: "Bu rəyi silmək istədiyinizə əminsiniz?",
+    deleteCommentSuccess: "Rəy silindi.",
+    deleteCommentFailed: "Rəyi silmək mümkün olmadı.",
   },
   en: {
     heading: "Customer Reviews",
@@ -116,6 +133,14 @@ const copyByLocale: Record<Locale, Copy> = {
     alreadyReviewed: "You already posted a review for this perfume.",
     oneReviewOnly: "Each user can post only one review per perfume.",
     configMissing: "Supabase configuration is missing.",
+    deleteOwnComment: "Delete",
+    deletingComment: "Deleting...",
+    deleteCommentTitle: "Delete review",
+    deleteCommentCancel: "Cancel",
+    deleteCommentAction: "Yes, delete",
+    deleteCommentConfirm: "Are you sure you want to delete this review?",
+    deleteCommentSuccess: "Comment deleted.",
+    deleteCommentFailed: "Could not delete this comment.",
   },
   ru: {
     heading: "Отзывы покупателей",
@@ -149,6 +174,14 @@ const copyByLocale: Record<Locale, Copy> = {
     alreadyReviewed: "Вы уже оставили отзыв для этого аромата.",
     oneReviewOnly: "Каждый пользователь может оставить только один отзыв для аромата.",
     configMissing: "Конфигурация Supabase отсутствует.",
+    deleteOwnComment: "Удалить",
+    deletingComment: "Удаление...",
+    deleteCommentTitle: "Удалить отзыв",
+    deleteCommentCancel: "Отмена",
+    deleteCommentAction: "Да, удалить",
+    deleteCommentConfirm: "Вы уверены, что хотите удалить этот отзыв?",
+    deleteCommentSuccess: "Комментарий удален.",
+    deleteCommentFailed: "Не удалось удалить комментарий.",
   },
 };
 
@@ -182,17 +215,29 @@ const getUsernameFromMetadata = (metadata: unknown) => {
   return candidates[0] ?? "";
 };
 
+const getAvatarFromMetadata = (metadata: unknown) => {
+  if (!metadata || typeof metadata !== "object") {
+    return "";
+  }
+
+  const meta = metadata as Record<string, unknown>;
+  const avatar = meta.avatar_url;
+  return typeof avatar === "string" ? avatar.trim() : "";
+};
+
 const normalizeCommentRows = (rows: unknown[]): CommentRow[] => {
   return rows
     .filter((row): row is Record<string, unknown> => typeof row === "object" && row !== null)
     .map((row) => {
       const usernameValue = typeof row.username === "string" ? row.username.trim() : "";
       const emailValue = typeof row.user_email === "string" ? row.user_email : null;
+      const avatarValue = typeof row.avatar_url === "string" ? row.avatar_url.trim() : "";
 
       return {
         id: String(row.id ?? ""),
         user_id: String(row.user_id ?? ""),
         username: usernameValue || getUsernameFromEmail(emailValue) || "user",
+        avatar_url: avatarValue || null,
         user_email: emailValue,
         perfume_slug: String(row.perfume_slug ?? ""),
         rating: Number(row.rating ?? 0),
@@ -219,6 +264,10 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
   const [messageTone, setMessageTone] = useState<"success" | "error">("error");
   const [lastSubmittedAt, setLastSubmittedAt] = useState<number>(0);
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState("");
+  const [pendingDeleteCommentId, setPendingDeleteCommentId] = useState("");
+  const sortMenuRef = useRef<HTMLDivElement | null>(null);
 
   const effectiveRating = hoverRating ?? rating;
 
@@ -253,6 +302,52 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
   }, [supabase]);
 
   useEffect(() => {
+    if (!pendingDeleteCommentId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingDeleteCommentId("");
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [pendingDeleteCommentId]);
+
+  useEffect(() => {
+    if (!isSortMenuOpen) {
+      return;
+    }
+
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target;
+      if (!sortMenuRef.current || !(target instanceof Node)) {
+        return;
+      }
+      if (!sortMenuRef.current.contains(target)) {
+        setIsSortMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsSortMenuOpen(false);
+      }
+    };
+
+    window.addEventListener("mousedown", handleOutside);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("mousedown", handleOutside);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isSortMenuOpen]);
+
+  useEffect(() => {
     if (!supabase) {
       return;
     }
@@ -262,7 +357,7 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     const loadComments = async () => {
       setIsLoading(true);
 
-      const withUsernameSelect = "id,user_id,username,user_email,perfume_slug,rating,comment,created_at";
+      const withUsernameSelect = "id,user_id,username,avatar_url,user_email,perfume_slug,rating,comment,created_at";
       const fallbackSelect = "id,user_id,user_email,perfume_slug,rating,comment,created_at";
 
       const primaryQuery = await supabase
@@ -273,7 +368,10 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
 
       let rows: unknown[] = (primaryQuery.data as unknown[] | null) ?? [];
 
-      if (primaryQuery.error?.message.toLowerCase().includes("username")) {
+      if (
+        primaryQuery.error?.message.toLowerCase().includes("username") ||
+        primaryQuery.error?.message.toLowerCase().includes("avatar_url")
+      ) {
         const fallbackQuery = await supabase
           .from("comments")
           .select(fallbackSelect)
@@ -326,6 +424,10 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     return getUsernameFromEmail(session?.user?.email);
   }, [session?.user?.email, session?.user?.user_metadata]);
 
+  const currentSessionAvatarUrl = useMemo(() => {
+    return getAvatarFromMetadata(session?.user?.user_metadata);
+  }, [session?.user?.user_metadata]);
+
   const submitComment = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -376,6 +478,7 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     setMessageTone("error");
 
     const metadataUsername = getUsernameFromMetadata(session.user.user_metadata);
+    const metadataAvatar = getAvatarFromMetadata(session.user.user_metadata);
     const commentUsername = metadataUsername || getUsernameFromEmail(session.user.email);
 
     if (!commentUsername) {
@@ -387,11 +490,24 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     let { error } = await supabase.from("comments").insert({
       user_id: session.user.id,
       username: commentUsername,
+      avatar_url: metadataAvatar || null,
       user_email: session.user.email ?? "",
       perfume_slug: perfumeSlug,
       rating,
       comment: normalizedComment,
     });
+
+    if (error?.message.toLowerCase().includes("avatar_url")) {
+      const withoutAvatarInsert = await supabase.from("comments").insert({
+        user_id: session.user.id,
+        username: commentUsername,
+        user_email: session.user.email ?? "",
+        perfume_slug: perfumeSlug,
+        rating,
+        comment: normalizedComment,
+      });
+      error = withoutAvatarInsert.error;
+    }
 
     if (error?.message.toLowerCase().includes("username")) {
       const fallbackInsert = await supabase.from("comments").insert({
@@ -418,7 +534,7 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
       return;
     }
 
-    const withUsernameSelect = "id,user_id,username,user_email,perfume_slug,rating,comment,created_at";
+    const withUsernameSelect = "id,user_id,username,avatar_url,user_email,perfume_slug,rating,comment,created_at";
     const fallbackSelect = "id,user_id,user_email,perfume_slug,rating,comment,created_at";
     const primaryRefreshQuery = await supabase
       .from("comments")
@@ -428,7 +544,10 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
 
     let refreshedRows: unknown[] = (primaryRefreshQuery.data as unknown[] | null) ?? [];
 
-    if (primaryRefreshQuery.error?.message.toLowerCase().includes("username")) {
+    if (
+      primaryRefreshQuery.error?.message.toLowerCase().includes("username") ||
+      primaryRefreshQuery.error?.message.toLowerCase().includes("avatar_url")
+    ) {
       const fallbackRefreshQuery = await supabase
         .from("comments")
         .select(fallbackSelect)
@@ -446,6 +565,46 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
     setIsSubmitting(false);
   };
 
+  const requestDeleteComment = (commentId: string) => {
+    if (!commentId) {
+      return;
+    }
+    setPendingDeleteCommentId(commentId);
+  };
+
+  const confirmDeleteComment = async () => {
+    const commentId = pendingDeleteCommentId;
+    if (!supabase || !session?.user?.id) {
+      setMessageTone("error");
+      setMessage(copy.loginRequired);
+      router.push(loginHref);
+      setPendingDeleteCommentId("");
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+    const { error } = await supabase
+      .from("comments")
+      .delete()
+      .eq("id", commentId)
+      .eq("user_id", session.user.id)
+      .eq("perfume_slug", perfumeSlug);
+
+    if (error) {
+      setMessageTone("error");
+      setMessage(copy.deleteCommentFailed);
+      setPendingDeleteCommentId("");
+      setDeletingCommentId("");
+      return;
+    }
+
+    setComments((prev) => prev.filter((item) => item.id !== commentId));
+    setMessageTone("success");
+    setMessage(copy.deleteCommentSuccess);
+    setPendingDeleteCommentId("");
+    setDeletingCommentId("");
+  };
+
   if (!isSupabaseConfigured(supabaseConfig ?? undefined)) {
     return <p className="text-sm text-zinc-600">{copy.configMissing}</p>;
   }
@@ -458,18 +617,55 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
           <p className="mt-3 text-zinc-500">{copy.subheading}</p>
         </div>
 
-        <label className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs tracking-[0.08em] text-zinc-500 uppercase shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-          <span>{copy.rating}</span>
-          <select
-            value={sortOrder}
-            onChange={(event) => setSortOrder(event.target.value === "asc" ? "asc" : "desc")}
-            className="rounded-full bg-transparent pr-2 text-xs text-zinc-700 outline-none"
+        <div ref={sortMenuRef} className="relative">
+          <button
+            type="button"
+            onClick={() => setIsSortMenuOpen((prev) => !prev)}
+            className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs tracking-[0.08em] text-zinc-500 uppercase shadow-[0_8px_24px_rgba(0,0,0,0.04)]"
             aria-label="Sort reviews"
+            aria-expanded={isSortMenuOpen}
           >
-            <option value="desc">{copy.newest}</option>
-            <option value="asc">{copy.oldest}</option>
-          </select>
-        </label>
+            <span>{copy.rating}</span>
+            <span className="text-zinc-700 normal-case">{sortOrder === "desc" ? copy.newest : copy.oldest}</span>
+            <CaretDown
+              size={12}
+              weight="bold"
+              className={`text-zinc-500 transition-transform duration-200 ${isSortMenuOpen ? "rotate-180" : ""}`}
+            />
+          </button>
+          {isSortMenuOpen ? (
+            <div className="absolute top-[calc(100%+0.5rem)] right-0 z-20 min-w-[170px] rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-[0_18px_42px_rgba(20,20,20,0.16)]">
+              <button
+                type="button"
+                onClick={() => {
+                  setSortOrder("desc");
+                  setIsSortMenuOpen(false);
+                }}
+                className={`flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
+                  sortOrder === "desc"
+                    ? "bg-zinc-900 text-white"
+                    : "font-medium text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                {copy.newest}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSortOrder("asc");
+                  setIsSortMenuOpen(false);
+                }}
+                className={`mt-1 flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors duration-200 ${
+                  sortOrder === "asc"
+                    ? "bg-zinc-900 text-white"
+                    : "font-medium text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                {copy.oldest}
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-8 space-y-5">
@@ -611,6 +807,9 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                 const displayUsername = isOwnComment
                   ? currentSessionUsername || item.username || copy.unknownUser
                   : item.username || copy.unknownUser;
+                const displayAvatarUrl = isOwnComment
+                  ? currentSessionAvatarUrl || item.avatar_url || ""
+                  : item.avatar_url || "";
 
                 return (
                 <article
@@ -619,9 +818,18 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700">
-                        {displayUsername.slice(0, 1).toUpperCase()}
-                      </div>
+                      {displayAvatarUrl ? (
+                        <img
+                          src={displayAvatarUrl}
+                          alt={displayUsername}
+                          className="h-9 w-9 rounded-full object-cover ring-1 ring-zinc-200"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="grid h-9 w-9 place-items-center rounded-full bg-zinc-100 text-xs font-semibold text-zinc-700">
+                          {displayUsername.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2.5">
                         <p className="text-sm font-medium text-zinc-800">{displayUsername}</p>
                         <div className="flex items-center gap-1 text-rose-500">
@@ -635,11 +843,26 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
                         </div>
                       </div>
                     </div>
-                    <p className="text-xs text-zinc-500">
-                      {new Intl.DateTimeFormat(localeFormat[locale], {
-                        dateStyle: "medium",
-                      }).format(new Date(item.created_at))}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      {isOwnComment ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            requestDeleteComment(item.id);
+                          }}
+                          disabled={deletingCommentId === item.id}
+                          className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-colors duration-200 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Trash size={12} />
+                          {deletingCommentId === item.id ? copy.deletingComment : copy.deleteOwnComment}
+                        </button>
+                      ) : null}
+                      <p className="text-xs text-zinc-500">
+                        {new Intl.DateTimeFormat(localeFormat[locale], {
+                          dateStyle: "medium",
+                        }).format(new Date(item.created_at))}
+                      </p>
+                    </div>
                   </div>
 
                   <div className="my-4 h-px bg-[rgba(0,0,0,0.05)]" />
@@ -650,6 +873,42 @@ export function PerfumeCommentsSection({ perfumeSlug, locale, supabase: supabase
             : null}
         </div>
       </div>
+      {typeof document !== "undefined" && pendingDeleteCommentId
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[130] flex items-end justify-center bg-zinc-900/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4"
+          onClick={() => setPendingDeleteCommentId("")}
+        >
+          <div
+            className="w-full rounded-t-3xl border border-zinc-200 bg-white p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_28px_64px_rgba(18,18,18,0.24)] animate-[accountPopIn_320ms_cubic-bezier(0.22,1,0.36,1)] sm:max-w-md sm:rounded-3xl sm:pb-6"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-900">{copy.deleteCommentTitle}</h3>
+            <p className="mt-2 text-sm leading-6 text-zinc-600">{copy.deleteCommentConfirm}</p>
+            <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteCommentId("")}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-50 sm:min-h-10 sm:w-auto"
+              >
+                {copy.deleteCommentCancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  void confirmDeleteComment();
+                }}
+                disabled={deletingCommentId === pendingDeleteCommentId}
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10 sm:w-auto"
+              >
+                {deletingCommentId === pendingDeleteCommentId ? copy.deletingComment : copy.deleteCommentAction}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )
+        : null}
     </section>
   );
 }
