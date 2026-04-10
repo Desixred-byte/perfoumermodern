@@ -180,7 +180,7 @@ export const translations = {
     modal: {
       info: "Məlumat",
       title: "Şəkil tanıtım xarakteri daşıyır",
-      body: "Bütün ətirlər Perfoumer qutusunda və qoruyucu qablaşdırmada göndərilir.",
+      body: "Ətir şəkli yalnız tanıtım məqsədi daşıyır. Məhsullarımız öz brendimizə məxsus yüksək keyfiyyətli qablaşdırmada göndərilir.",
     },
     notFound: {
       title: "Məhsul tapılmadı",
@@ -346,7 +346,7 @@ export const translations = {
     modal: {
       info: "Info",
       title: "The image is for presentation purposes",
-      body: "All perfumes are shipped in Perfoumer boxes with protective packaging.",
+      body: "The image of the perfume is for illustrative purposes only. Our products come in our own branded high quality packages.",
     },
     notFound: {
       title: "Product not found",
@@ -512,7 +512,7 @@ export const translations = {
     modal: {
       info: "Информация",
       title: "Изображение носит ознакомительный характер",
-      body: "Все ароматы отправляются в коробке Perfoumer и защитной упаковке.",
+      body: "Изображение аромата носит только иллюстративный характер. Наши товары отправляются в фирменной высококачественной упаковке.",
     },
     notFound: {
       title: "Товар не найден",

@@ -1126,12 +1126,16 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
               className="sr-only"
               disabled={isAvatarBusy || isBusy}
               onChange={async (event) => {
-                const file = event.target.files?.[0];
+                const input = event.currentTarget;
+                const file = input.files?.[0];
                 if (!file) {
                   return;
                 }
-                await uploadAvatar(file);
-                event.currentTarget.value = "";
+                try {
+                  await uploadAvatar(file);
+                } finally {
+                  input.value = "";
+                }
               }}
             />
           </label>

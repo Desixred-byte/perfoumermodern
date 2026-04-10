@@ -228,30 +228,31 @@ export function PerfumeScentSummaryPanel({ perfumeSlug, locale, supabase: supaba
   }
 
   return (
-    <section className="scent-summary-panel mt-10 rounded-[1.8rem] border border-zinc-200/80 bg-[linear-gradient(140deg,rgba(255,255,255,0.95)_0%,rgba(248,248,246,0.92)_50%,rgba(241,239,235,0.9)_100%)] p-6 shadow-[0_10px_28px_rgba(0,0,0,0.05)] md:p-7">
+    <section className="scent-summary-panel mt-10 rounded-[1.95rem] border border-zinc-200/80 bg-white/96 p-6 shadow-[0_20px_54px_rgba(24,24,24,0.05)] md:p-7">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-[0.72rem] font-semibold tracking-[0.18em] text-zinc-500 uppercase">
+          <p className="text-[0.7rem] font-semibold tracking-[0.2em] text-zinc-500 uppercase">
             {copy.summaryTitle}
           </p>
-          <p className="mt-1 text-sm text-zinc-600">{copy.summaryDescription}</p>
+          <p className="mt-1 text-sm leading-6 text-zinc-600">{copy.summaryDescription}</p>
         </div>
         <button
           type="button"
           onClick={summarizeScent}
           disabled={isSummaryLoading}
-          className="group relative inline-flex min-h-11 items-center gap-2 overflow-hidden rounded-full border border-zinc-300 bg-white px-5 text-sm font-medium text-zinc-800 shadow-[0_10px_20px_rgba(0,0,0,0.06)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-50 hover:shadow-[0_14px_26px_rgba(0,0,0,0.1)] disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex min-h-11 items-center gap-2 rounded-full border border-zinc-300/90 bg-zinc-50/90 px-5 text-sm font-medium text-zinc-800 shadow-[0_8px_18px_rgba(24,24,24,0.07)] transition-all duration-300 hover:-translate-y-[1px] hover:border-zinc-400 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="pointer-events-none absolute inset-y-0 left-[-28%] w-[34%] -skew-x-12 bg-[linear-gradient(90deg,transparent_0%,rgba(255,255,255,0.65)_55%,transparent_100%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100 group-hover:animate-[scentSummaryGlint_780ms_ease-out]" />
           <Sparkle size={16} weight="duotone" className={isSummaryLoading ? "animate-spin" : ""} />
           {isSummaryLoading ? copy.summaryLoading : copy.summarizeScent}
         </button>
       </div>
 
-      {summaryError ? <p className="mt-3 text-sm text-zinc-500">{summaryError}</p> : null}
+      {summaryError ? (
+        <p className="mt-3 rounded-xl border border-zinc-200 bg-zinc-50/70 px-3 py-2 text-sm text-zinc-600">{summaryError}</p>
+      ) : null}
 
       {isSummaryLoading ? (
-        <div className="mt-4 rounded-2xl border border-zinc-200/80 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+        <div className="mt-4 rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4">
           <div className="scent-summary-skeleton h-4 w-10/12 rounded-lg" />
           <div className="scent-summary-skeleton mt-2 h-4 w-9/12 rounded-lg" />
           <div className="scent-summary-skeleton mt-2 h-4 w-8/12 rounded-lg" />
@@ -264,7 +265,7 @@ export function PerfumeScentSummaryPanel({ perfumeSlug, locale, supabase: supaba
       ) : null}
 
       {aiSummary ? (
-        <div className="summary-reveal mt-4 rounded-2xl border border-zinc-200/80 bg-white/90 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)]">
+        <div className="summary-reveal mt-4 rounded-2xl border border-zinc-200/80 bg-zinc-50/70 p-4">
           <p className="text-[0.65rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">{copy.summaryOverviewLabel}</p>
           <div className="mt-2 space-y-1.5">
             {formatSummaryParagraphs(aiSummary).map((paragraph, index) => (
@@ -278,12 +279,12 @@ export function PerfumeScentSummaryPanel({ perfumeSlug, locale, supabase: supaba
               <p className="mt-4 text-[0.65rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
                 {copy.summaryHighlightsLabel}
               </p>
-              <ul className="mt-2 space-y-1.5">
+              <ul className="mt-2 space-y-1.5 border-t border-zinc-200/80 pt-2.5">
               {summaryHighlights.map((item, index) => (
                 <li
                   key={item}
                   style={{ animationDelay: `${120 + index * 70}ms` }}
-                  className="summary-highlight-reveal flex items-start gap-2 rounded-xl border border-zinc-200/70 bg-zinc-50/70 px-3 py-2 text-sm text-zinc-600"
+                  className="summary-highlight-reveal flex items-start gap-2 text-sm text-zinc-600"
                 >
                   <span className="mt-[0.5rem] inline-block h-1.5 w-1.5 rounded-full bg-zinc-500" />
                   <span className="leading-6">{renderHighlightText(item)}</span>
