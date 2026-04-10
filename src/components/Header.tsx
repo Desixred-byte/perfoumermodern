@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import { ArrowRight } from "@phosphor-icons/react";
 import type { Session } from "@supabase/supabase-js";
 import { getDictionary, locales, type Locale } from "@/lib/i18n";
@@ -16,6 +16,8 @@ type HeaderProps = {
 
 export function Header({ floating = false, locale }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
+  const [isLocalePending, startLocaleTransition] = useTransition();
   const [session, setSession] = useState<Session | null>(null);
   const router = useRouter();
   const pathname = usePathname();
@@ -90,40 +92,30 @@ export function Header({ floating = false, locale }: HeaderProps) {
   }, [supabase]);
 
   const menuTransition =
-    "transition-all duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]";
+    "transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]";
   const stickTransition =
     "absolute left-1/2 top-1/2 block h-0.5 w-4 -translate-x-1/2 rounded-full bg-zinc-800 opacity-100 transition-transform duration-400 ease-[cubic-bezier(0.22,1,0.36,1)]";
 
   const updateLocale = async (nextLocale: Locale) => {
-    if (nextLocale === locale) {
+    if (nextLocale === locale || isLocalePending) {
       return;
     }
 
-    await fetch("/api/locale", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ locale: nextLocale }),
-    });
+    setPendingLocale(nextLocale);
     setIsMenuOpen(false);
-    router.refresh();
-  };
 
-  const handleLogoMouseMove = (event: MouseEvent<HTMLSpanElement>) => {
-    const target = event.currentTarget;
-    const rect = target.getBoundingClientRect();
-    const x = (event.clientX - rect.left) / rect.width;
-    const y = (event.clientY - rect.top) / rect.height;
-
-    const rotateY = (x - 0.5) * 14;
-    const rotateX = (0.5 - y) * 14;
-
-    target.style.setProperty("--logo-rx", `${rotateX.toFixed(2)}deg`);
-    target.style.setProperty("--logo-ry", `${rotateY.toFixed(2)}deg`);
-  };
-
-  const handleLogoMouseLeave = (event: MouseEvent<HTMLSpanElement>) => {
-    event.currentTarget.style.setProperty("--logo-rx", "0deg");
-    event.currentTarget.style.setProperty("--logo-ry", "0deg");
+    startLocaleTransition(async () => {
+      try {
+        await fetch("/api/locale", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ locale: nextLocale }),
+          keepalive: true,
+        });
+      } finally {
+        router.refresh();
+      }
+    });
   };
 
   return (
@@ -137,20 +129,18 @@ export function Header({ floating = false, locale }: HeaderProps) {
         <div className="mx-auto mt-1 flex max-w-[1540px] items-center justify-between px-3 py-3 sm:px-6 sm:py-6 md:px-10">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-3 sm:px-4 sm:py-2"
+            className="header-load-in header-load-in--logo inline-flex items-center gap-0.5 rounded-xl bg-white px-2.5 py-1.5 text-zinc-800 opacity-100 shadow-sm ring-1 ring-zinc-200/80 sm:gap-1 sm:px-4 sm:py-2"
             onClick={() => setIsMenuOpen(false)}
           >
             <span
-              className="header-logo-orb grid h-7 w-7 place-items-center rounded-lg sm:h-9 sm:w-9"
-              onMouseMove={handleLogoMouseMove}
-              onMouseLeave={handleLogoMouseLeave}
+              className="grid h-9 w-9 place-items-center rounded-lg sm:h-11 sm:w-11"
             >
               <Image
-                src="/logo.webp"
+                src="/perfoumer_black.png"
                 alt="Perfoumer"
                 width={28}
                 height={28}
-                className="header-logo-image h-6 w-6 object-contain sm:h-8 sm:w-8"
+                className="h-8 w-8 object-contain sm:h-10 sm:w-10"
                 priority
               />
             </span>
@@ -163,16 +153,17 @@ export function Header({ floating = false, locale }: HeaderProps) {
               </span>
             </span>
           </Link>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="header-load-in header-load-in--controls flex items-center gap-2 sm:gap-3">
             <div className="hidden items-center rounded-full bg-white/92 p-1 shadow-sm ring-1 ring-zinc-200/80 md:flex">
               {locales.map((item) => (
                 <button
                   key={item}
                   type="button"
                   onClick={() => updateLocale(item)}
+                  disabled={isLocalePending}
                   className={[
-                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-300",
-                    locale === item
+                    "rounded-full px-2.5 py-1 text-xs font-medium transition-colors duration-200 disabled:cursor-wait disabled:opacity-70",
+                    (pendingLocale ?? locale) === item
                       ? "bg-zinc-900 text-white"
                       : "text-zinc-500 hover:text-zinc-800",
                   ].join(" ")}
@@ -237,9 +228,10 @@ export function Header({ floating = false, locale }: HeaderProps) {
                   key={item}
                   type="button"
                   onClick={() => updateLocale(item)}
+                  disabled={isLocalePending}
                   className={[
-                    "rounded-full px-2.5 py-1 text-[0.72rem] font-medium tracking-[0.2em] transition-all duration-300",
-                    locale === item
+                    "rounded-full px-2.5 py-1 text-[0.72rem] font-medium tracking-[0.2em] transition-all duration-200 disabled:cursor-wait disabled:opacity-70",
+                    (pendingLocale ?? locale) === item
                       ? "bg-zinc-900 text-white shadow-[0_8px_18px_rgba(24,24,24,0.16)]"
                       : "border border-transparent text-zinc-500 hover:text-zinc-800",
                   ].join(" ")}

@@ -760,7 +760,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   };
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-2 pb-24 pt-3 sm:px-3 sm:pb-6 sm:pt-4 lg:px-4">
+    <section className="mx-auto w-full max-w-none px-0 pb-10 pt-3 sm:pb-6 sm:pt-4">
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-zinc-500">{dictionary.eyebrow}</p>
         <h1 className="mt-2 text-3xl leading-tight text-zinc-900 sm:text-4xl">{dictionary.title}</h1>
@@ -861,8 +861,6 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
       ) : (
         <div className="quiz-results-enter mt-4">
           <div className="quiz-results-hero relative overflow-hidden rounded-[1.35rem] px-3 py-4 sm:px-4 sm:py-4.5 lg:px-5 lg:py-5">
-            <span aria-hidden="true" className="quiz-results-spark quiz-results-spark-main" />
-            <span aria-hidden="true" className="quiz-results-spark quiz-results-spark-soft" />
             <div className="qoxunu-result-header grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
               <div>
                 <h2 className="text-[1.7rem] leading-tight text-zinc-900 sm:text-[1.95rem] lg:text-[2.15rem]">{dictionary.resultTitle}</h2>
@@ -885,7 +883,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                 </button>
                 <Link
                   href="/catalog"
-                  className="inline-flex min-h-9 w-full items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-4 text-xs font-semibold text-[#fffdf8] shadow-[0_12px_24px_rgba(90,70,35,0.2)] transition duration-300 md:w-auto md:hover:-translate-y-0.5 md:hover:bg-[#5f4925]"
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-4 text-xs font-semibold text-white shadow-[0_12px_24px_rgba(24,24,24,0.18)] transition duration-300 md:w-auto md:hover:-translate-y-0.5 md:hover:bg-zinc-800"
                 >
                   {dictionary.seeCatalog}
                 </Link>
@@ -896,7 +894,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           {isMobileLayout ? (
             <div className="mt-3 space-y-3">
               {isAiLoading ? (
-                <div className="rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-4">
+                <div className="rounded-xl border border-zinc-200 bg-white px-3 py-4">
                   <p className="text-sm font-medium text-zinc-700">{dictionary.generating}</p>
                   <p className="mt-1 text-xs text-zinc-500">{dictionary.generatingHint}</p>
                   <div className="mt-3 space-y-2">
@@ -908,7 +906,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               ) : null}
 
               {!isAiLoading && featuredMatch ? (
-                <section className="qoxunu-mobile-featured rounded-[1.35rem] border border-zinc-200 bg-white p-3">
+                <section className="qoxunu-mobile-featured rounded-xl border border-zinc-200 bg-white p-3">
                   <div className="flex items-center justify-between gap-2">
                     <p className="inline-flex rounded-full border border-zinc-300/90 bg-[#f7f6f3] px-2.5 py-1 text-[0.62rem] font-semibold tracking-[0.11em] text-zinc-700 uppercase">
                       {dictionary.topPickLabel}
@@ -931,7 +929,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                   <p className="mb-2 text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.otherPicksLabel}</p>
                   <div className="qoxunu-mobile-carousel -mx-2 flex gap-3 overflow-x-auto px-2 pb-2 pr-5 snap-x snap-mandatory">
                     {secondaryMatches.map((perfume, index) => (
-                      <div key={perfume.id} className="qoxunu-mobile-slide min-w-[82vw] max-w-[82vw] snap-center rounded-[1.25rem] border border-zinc-200 bg-white p-3">
+                      <div key={perfume.id} className="qoxunu-mobile-slide min-w-[82vw] max-w-[82vw] snap-center rounded-xl border border-zinc-200 bg-white p-3">
                         {renderResultMeta(perfume, index + 2, true)}
                         <div className="mt-3 border-t border-zinc-200 pt-3">
                           <ProductCard perfume={perfume} locale={locale} />
@@ -943,58 +941,83 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               ) : null}
 
               {!isAiLoading && !featuredMatch ? (
-                <div className="quiz-results-empty rounded-[1.2rem] border border-zinc-200 bg-white px-3 py-3 text-zinc-500">
+                <div className="quiz-results-empty rounded-xl border border-zinc-200 bg-white px-3 py-3 text-zinc-500">
                   <p className="text-lg font-semibold text-zinc-700">{dictionary.noMatchTitle}</p>
                   <p className="mt-1.5 text-sm leading-6">{dictionary.noMatchDescription}</p>
                 </div>
               ) : null}
 
               <div className="qoxunu-mobile-dock">
-                {isSummaryExpanded ? (
-                  <div className="qoxunu-mobile-dock-panel rounded-[1.25rem] border border-zinc-200 bg-white px-3 py-3">
+                <div
+                  className={[
+                    "qoxunu-mobile-dock-panel rounded-lg border border-zinc-200 bg-white px-3 py-3",
+                    isSummaryExpanded ? "qoxunu-mobile-dock-panel--open" : "qoxunu-mobile-dock-panel--closed",
+                  ].join(" ")}
+                >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="text-[0.67rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</p>
-                        <p className="qoxunu-summary-preview mt-1 text-sm leading-6 text-zinc-700">{summaryPreview || aiSummary}</p>
+                        <p className="mt-1 text-sm leading-6 text-zinc-700">{aiSummary || summaryPreview || dictionary.generatingHint}</p>
                       </div>
                       <button
                         type="button"
                         onClick={() => setIsSummaryExpanded(false)}
-                        className="shrink-0 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 py-2 text-[0.65rem] font-semibold text-zinc-700"
+                        aria-label={dictionary.showLess}
+                        className="qoxunu-dock-toggle group"
                       >
-                        {dictionary.showLess}
+                        <span className="qoxunu-dock-toggle-stick qoxunu-dock-toggle-stick-top qoxunu-dock-toggle-stick-top--open" />
+                        <span className="qoxunu-dock-toggle-stick qoxunu-dock-toggle-stick-bottom qoxunu-dock-toggle-stick-bottom--open" />
                       </button>
                     </div>
 
-                    <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                    <div className="mt-3 grid grid-cols-1 gap-2">
                       {summaryChips.map((chip) => (
-                        <div key={chip.label} className="qoxunu-summary-chip min-w-[72%] shrink-0 rounded-xl border border-zinc-200/80 bg-[#fafaf8] px-3 py-2">
+                        <div key={chip.label} className="qoxunu-summary-chip rounded-xl border border-zinc-200/80 bg-[#fafaf8] px-3 py-2">
                           <p className="text-[0.62rem] font-semibold tracking-[0.12em] text-zinc-500 uppercase">{chip.label}</p>
                           <p className="mt-1 text-[0.8rem] leading-5 text-zinc-700">{chip.value}</p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                ) : null}
 
-                <div className="qoxunu-mobile-dock-bar rounded-[1.15rem] border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-[0_12px_28px_rgba(24,24,24,0.08)] backdrop-blur-md">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setIsSummaryExpanded((value) => !value)}
-                      className="min-h-11 flex-1 rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 text-left text-[0.78rem] font-medium text-zinc-700"
-                    >
-                      <span className="block text-[0.62rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</span>
-                      <span className="mt-1 block truncate text-[0.8rem] leading-5 text-zinc-700">{summaryPreview || aiSummary}</span>
-                    </button>
+                    <div className="mt-3">
+                      <Link
+                        href="/catalog"
+                        className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(24,24,24,0.18)]"
+                      >
+                        {dictionary.seeCatalog}
+                      </Link>
+                    </div>
+                </div>
 
-                    <Link
-                      href="/catalog"
-                      className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-4 text-sm font-semibold text-[#fffdf8] shadow-[0_12px_24px_rgba(90,70,35,0.2)]"
-                    >
-                      {dictionary.seeCatalog}
-                    </Link>
-                  </div>
+                <div
+                  className={[
+                    "qoxunu-mobile-dock-bar rounded-lg border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-[0_12px_28px_rgba(24,24,24,0.08)] backdrop-blur-md",
+                    isSummaryExpanded ? "qoxunu-mobile-dock-bar--hidden" : "qoxunu-mobile-dock-bar--visible",
+                  ].join(" ")}
+                >
+                    <div className="flex items-center gap-2">
+                      <div className="min-h-[56px] flex-1 rounded-lg border border-zinc-300 bg-[#f6f5f2] px-3 py-2 text-left text-[0.78rem] font-medium text-zinc-700">
+                        <span className="block text-[0.62rem] font-semibold tracking-[0.14em] text-zinc-500 uppercase">{dictionary.aiSummaryLabel}</span>
+                        <span className="mt-0.5 block line-clamp-2 text-[0.8rem] leading-[1.3] text-zinc-700">{summaryPreview || aiSummary || dictionary.generatingHint}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setIsSummaryExpanded((value) => !value)}
+                        aria-label={dictionary.showMore}
+                        className="qoxunu-dock-toggle group"
+                      >
+                        <span className="qoxunu-dock-toggle-stick qoxunu-dock-toggle-stick-top" />
+                        <span className="qoxunu-dock-toggle-stick qoxunu-dock-toggle-stick-bottom" />
+                      </button>
+
+                      <Link
+                        href="/catalog"
+                        className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-4 text-sm font-semibold text-white shadow-[0_12px_24px_rgba(24,24,24,0.18)]"
+                      >
+                        {dictionary.seeCatalog}
+                      </Link>
+                    </div>
                 </div>
               </div>
             </div>
@@ -1076,15 +1099,6 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               ) : null}
             </>
           )}
-
-          <div className="qoxunu-sticky-cta md:hidden">
-            <Link
-              href="/catalog"
-              className="qoxunu-sticky-cta-button inline-flex min-h-11 w-full items-center justify-center rounded-full border border-[#5f4925] bg-[#6e5530] px-5 text-sm font-semibold text-[#fffdf8] shadow-[0_14px_28px_rgba(90,70,35,0.22)]"
-            >
-              {dictionary.seeCatalog}
-            </Link>
-          </div>
         </div>
       )}
     </section>
