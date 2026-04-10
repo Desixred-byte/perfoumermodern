@@ -9,8 +9,8 @@ export default async function AccountPage() {
 
   return (
     <div className="bg-[#f3f3f2]">
-      <div className="mx-auto max-w-[1540px] px-6 pb-14 md:px-10">
-        <section className="pt-8 pb-8">
+      <div className="mx-auto max-w-[1540px] px-6 pb-6 md:px-10 md:pb-8">
+        <section className="pt-8 pb-4 md:pb-5">
           <AccountClient locale={locale} supabase={supabaseConfig} />
         </section>
       </div>

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
   CircleNotch,
@@ -217,6 +218,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isEmailMenuOpen, setIsEmailMenuOpen] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+  const [isDomReady, setIsDomReady] = useState(false);
   const [editMode, setEditMode] = useState<"username" | "email" | null>(null);
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const profileResetTimerRef = useRef<number | null>(null);
@@ -316,6 +318,27 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
       window.sessionStorage.removeItem(ACCOUNT_NOTICE_KEY);
     }
   }, []);
+
+  useEffect(() => {
+    setIsDomReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isLogoutConfirmOpen) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsLogoutConfirmOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [isLogoutConfirmOpen]);
 
   useEffect(() => {
     return () => {
@@ -878,9 +901,16 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         </div>
       ) : null}
 
-      {isLogoutConfirmOpen ? (
-        <div className="fixed inset-0 z-[130] flex items-end justify-center bg-zinc-900/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4">
-          <div className="w-full rounded-t-3xl border border-zinc-200 bg-white p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_28px_64px_rgba(18,18,18,0.24)] animate-[accountPopIn_320ms_cubic-bezier(0.22,1,0.36,1)] sm:max-w-md sm:rounded-3xl sm:pb-6">
+      {isDomReady && isLogoutConfirmOpen
+        ? createPortal(
+        <div
+          className="fixed inset-0 z-[130] flex items-end justify-center bg-zinc-900/35 px-0 backdrop-blur-[2px] sm:items-center sm:px-4"
+          onClick={() => setIsLogoutConfirmOpen(false)}
+        >
+          <div
+            className="w-full rounded-t-3xl border border-zinc-200 bg-white p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-[0_28px_64px_rgba(18,18,18,0.24)] animate-[accountPopIn_320ms_cubic-bezier(0.22,1,0.36,1)] sm:max-w-md sm:rounded-3xl sm:pb-6"
+            onClick={(event) => event.stopPropagation()}
+          >
             <h3 className="text-xl font-semibold tracking-[-0.02em] text-zinc-900">{copy.logoutConfirmTitle}</h3>
             <p className="mt-2 text-sm leading-6 text-zinc-600">{copy.logoutConfirmBody}</p>
             <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
@@ -903,8 +933,10 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
               </button>
             </div>
           </div>
-        </div>
-      ) : null}
+        </div>,
+        document.body,
+      )
+        : null}
     </div>
   );
 }
