@@ -70,36 +70,118 @@ h6 {
   padding-inline: clamp(0.1rem, 1.8vw, 0.9rem);
 }
 
+.footer-wordmark-track {
+  display: inline-flex;
+  align-items: flex-end;
+}
+
+.footer-wordmark-letter {
+  display: inline-block;
+  line-height: 0.78;
+  --fade-low: 16%;
+  --fade-mid: 42%;
+  --fade-high: 62%;
+  -webkit-mask-image: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.2) var(--fade-low),
+    rgba(0, 0, 0, 0.82) var(--fade-mid),
+    rgba(0, 0, 0, 1) var(--fade-high),
+    rgba(0, 0, 0, 1) 100%
+  );
+  mask-image: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.2) var(--fade-low),
+    rgba(0, 0, 0, 0.82) var(--fade-mid),
+    rgba(0, 0, 0, 1) var(--fade-high),
+    rgba(0, 0, 0, 1) 100%
+  );
+}
+
+.footer-wordmark-letter:nth-child(2n) {
+  --fade-low: 19%;
+  --fade-mid: 45%;
+  --fade-high: 65%;
+}
+
+.footer-wordmark-letter:nth-child(3n) {
+  --fade-low: 14%;
+  --fade-mid: 39%;
+  --fade-high: 60%;
+}
+
 @keyframes footerWordmarkSheen {
   0% {
-    background-position: 0% 50%;
-    filter: contrast(1) saturate(1);
+    background-position: 0% 46%;
+    background-size: 220% 100%;
+    filter: contrast(0.98) saturate(0.94) brightness(0.96);
   }
-  50% {
-    background-position: 100% 50%;
-    filter: contrast(1.12) saturate(1.08);
+  32% {
+    background-position: 52% 53%;
+    background-size: 246% 103%;
+    filter: contrast(1.12) saturate(1.06) brightness(1.03);
+  }
+  68% {
+    background-position: 100% 48%;
+    background-size: 236% 101%;
+    filter: contrast(1.08) saturate(1.03) brightness(1.01);
   }
   100% {
-    background-position: 0% 50%;
-    filter: contrast(1) saturate(1);
+    background-position: 0% 46%;
+    background-size: 220% 100%;
+    filter: contrast(0.98) saturate(0.94) brightness(0.96);
+  }
+}
+
+@keyframes footerWordmarkPulse {
+  0% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.9;
   }
 }
 
 .footer-wordmark-animated {
   background-image: linear-gradient(
-    92deg,
-    #2d2f35 0%,
-    #6d727a 24%,
-    #23252b 48%,
-    #80858d 72%,
-    #2d2f35 100%
+    96deg,
+    #2c2f35 0%,
+    #5f646c 18%,
+    #1f2228 34%,
+    #7e848d 52%,
+    #252830 70%,
+    #8d939b 86%,
+    #2c2f35 100%
   );
   background-size: 220% 100%;
   background-position: 0% 50%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  animation: footerWordmarkSheen 3.4s cubic-bezier(0.37, 0, 0.63, 1) infinite;
+  -webkit-mask-image: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.25) 18%,
+    rgba(0, 0, 0, 0.78) 42%,
+    rgba(0, 0, 0, 1) 60%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  mask-image: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.25) 18%,
+    rgba(0, 0, 0, 0.78) 42%,
+    rgba(0, 0, 0, 1) 60%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  will-change: background-position, filter, opacity;
+  animation:
+    footerWordmarkSheen 6.2s cubic-bezier(0.37, 0, 0.63, 1) infinite,
+    footerWordmarkPulse 2.8s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
