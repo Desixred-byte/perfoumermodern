@@ -9,9 +9,9 @@ import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildAzeriPageKeywords } from "@/lib/seo";
 
 export const metadata: Metadata = {
-  title: "Onlayn Ətir Mağazası",
+  title: "Orijinal və Premium Ətirlər Onlayn",
   description:
-    "Kişi və qadın üçün orijinal premium ətirləri kəşf edin. Niş və dizayner kolleksiyaları, seçilmiş notlar və sürətli sifariş prosesi.",
+    "Orijinal və premium ətirləri onlayn kəşf edin. Kişi, qadın və uniseks ətirlər, niş və dizayner kolleksiyalar, sürətli sifariş və çatdırılma.",
   keywords: buildAzeriPageKeywords([
     "onlayn ətir mağazası",
     "orijinal ətir sifarişi",

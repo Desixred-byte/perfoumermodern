@@ -10,6 +10,21 @@ const nextConfig: NextConfig = {
 			},
 		],
 	},
+	async redirects() {
+		return [
+			{
+				source: "/:path*",
+				has: [
+					{
+						type: "host",
+						value: "www.perfoumer.az",
+					},
+				],
+				destination: "https://perfoumer.az/:path*",
+				permanent: true,
+			},
+		];
+	},
 	async headers() {
 		if (process.env.NODE_ENV === "production") {
 			return [];

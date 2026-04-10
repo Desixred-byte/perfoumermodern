@@ -1,5 +1,6 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
+import { unstable_cache } from "next/cache";
 
 import { parseCsv } from "@/lib/csv";
 import type { Note, Perfume, PerfumeSize, PerfumeWithNotes } from "@/types/catalog";
@@ -248,7 +249,7 @@ function normalizePerfume(value: unknown): Perfume | null {
   };
 }
 
-export async function getNotes(): Promise<Note[]> {
+async function getNotesSource(): Promise<Note[]> {
   const adminNotes = await readJsonSafely<unknown[]>(ADMIN_NOTES_JSON_PATH);
   if (Array.isArray(adminNotes)) {
     const parsed = adminNotes
@@ -274,7 +275,16 @@ export async function getNotes(): Promise<Note[]> {
   }));
 }
 
-export async function getPerfumes(): Promise<Perfume[]> {
+const getNotesCached = unstable_cache(getNotesSource, ["catalog-notes-v1"], {
+  revalidate: 300,
+  tags: ["catalog", "notes"],
+});
+
+export async function getNotes(): Promise<Note[]> {
+  return getNotesCached();
+}
+
+async function getPerfumesSource(): Promise<Perfume[]> {
   const adminPerfumes = await readJsonSafely<unknown[]>(ADMIN_PERFUMES_JSON_PATH);
   if (Array.isArray(adminPerfumes)) {
     const parsed = adminPerfumes
@@ -356,6 +366,15 @@ export async function getPerfumes(): Promise<Perfume[]> {
   }
 
   return Array.from(bySlug.values());
+}
+
+const getPerfumesCached = unstable_cache(getPerfumesSource, ["catalog-perfumes-v1"], {
+  revalidate: 300,
+  tags: ["catalog", "perfumes"],
+});
+
+export async function getPerfumes(): Promise<Perfume[]> {
+  return getPerfumesCached();
 }
 
 export async function getFeaturedPerfumes(limit = 8): Promise<Perfume[]> {

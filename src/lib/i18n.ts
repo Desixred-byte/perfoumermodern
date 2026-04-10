@@ -39,7 +39,7 @@ export const translations = {
     },
     hero: {
       eyebrow: "Perfoumer",
-      title: "Ruhunuzu və hisslərinizi ən incə qoxularla canlandırın.",
+      title: "Orijinal və premium ətirləri sizin üçün seçirik.",
       description: "Ruhunuzu oyandıran incə və unudulmaz qoxularla tanış olun.",
       discover: "Yeni Ətirləri Kəşf Et",
       viewAll: "Bütün Məhsulları Gör",
@@ -202,7 +202,7 @@ export const translations = {
     },
     hero: {
       eyebrow: "Perfoumer",
-      title: "Awaken your mood and emotions with the finest fragrances.",
+      title: "We curate original and premium fragrances for you.",
       description: "Discover subtle and unforgettable scents that elevate your spirit.",
       discover: "Discover New Perfumes",
       viewAll: "View All Products",
@@ -363,7 +363,7 @@ export const translations = {
     },
     hero: {
       eyebrow: "Perfoumer",
-      title: "Пробудите настроение и эмоции самыми изысканными ароматами.",
+      title: "Мы подбираем для вас оригинальные и премиальные ароматы.",
       description: "Откройте для себя тонкие и незабываемые ароматы.",
       discover: "Открыть новинки",
       viewAll: "Смотреть каталог",
