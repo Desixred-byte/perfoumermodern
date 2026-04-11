@@ -37,7 +37,6 @@ export function getSupabaseBrowserClient(config?: Partial<SupabasePublicConfig>)
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
-      multiTab: false,
     },
   });
   browserClientKey = configKey;
