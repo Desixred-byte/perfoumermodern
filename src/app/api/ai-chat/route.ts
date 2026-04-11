@@ -383,14 +383,14 @@ function normalizeStructuredResponse(content: string | undefined): StructuredAss
   try {
     const parsed = JSON.parse(content) as Partial<StructuredAssistantResponse>;
     const answer = typeof parsed.answer === "string" ? parsed.answer.trim() : "";
-    const rawFollowUp = parsed.followUp ?? {};
+    const rawFollowUp = (parsed.followUp ?? {}) as any;
     const question =
       typeof rawFollowUp === "object" && rawFollowUp && typeof rawFollowUp.question === "string"
         ? rawFollowUp.question.trim()
         : "";
     const options =
       typeof rawFollowUp === "object" && rawFollowUp && Array.isArray(rawFollowUp.options)
-        ? rawFollowUp.options.filter((option): option is string => typeof option === "string").map((option) => option.trim()).filter(Boolean).slice(0, 4)
+        ? rawFollowUp.options.filter((option: any): option is string => typeof option === "string").map((option: string) => option.trim()).filter(Boolean).slice(0, 4)
         : [];
     const allowFreeText =
       typeof rawFollowUp === "object" && rawFollowUp ? Boolean(rawFollowUp.allowFreeText) : false;
