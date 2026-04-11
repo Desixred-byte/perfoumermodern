@@ -71,6 +71,19 @@ create table if not exists public.checkout_addresses (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+create table if not exists public.ai_chat_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  locale text not null default 'en' check (char_length(locale) between 2 and 10),
+  title text not null default '' check (char_length(title) <= 140),
+  preview text not null default '' check (char_length(preview) <= 300),
+  messages_json jsonb not null default '[]'::jsonb,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  last_message_at timestamptz not null default timezone('utc', now()),
+  expires_at timestamptz not null default (timezone('utc', now()) + interval '3 hours')
+);
+
 alter table public.cart_items
   add column if not exists perfume_slug text;
 
@@ -122,6 +135,12 @@ create index if not exists cart_items_user_created_at_idx
 create index if not exists checkout_addresses_user_created_at_idx
   on public.checkout_addresses (user_id, created_at desc);
 
+create index if not exists ai_chat_sessions_user_last_message_idx
+  on public.ai_chat_sessions (user_id, last_message_at desc);
+
+create index if not exists ai_chat_sessions_user_expires_idx
+  on public.ai_chat_sessions (user_id, expires_at desc);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -144,10 +163,17 @@ before update on public.checkout_addresses
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists set_ai_chat_sessions_updated_at on public.ai_chat_sessions;
+create trigger set_ai_chat_sessions_updated_at
+before update on public.ai_chat_sessions
+for each row
+execute function public.set_updated_at();
+
 alter table public.comments enable row level security;
 alter table public.wishlists enable row level security;
 alter table public.cart_items enable row level security;
 alter table public.checkout_addresses enable row level security;
+alter table public.ai_chat_sessions enable row level security;
 
 drop policy if exists "Comments are visible to everyone" on public.comments;
 create policy "Comments are visible to everyone"
@@ -258,6 +284,35 @@ create policy "Users can update own checkout addresses"
 drop policy if exists "Users can delete own checkout addresses" on public.checkout_addresses;
 create policy "Users can delete own checkout addresses"
   on public.checkout_addresses
+  for delete
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "Users can read own ai chat sessions" on public.ai_chat_sessions;
+create policy "Users can read own ai chat sessions"
+  on public.ai_chat_sessions
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own ai chat sessions" on public.ai_chat_sessions;
+create policy "Users can insert own ai chat sessions"
+  on public.ai_chat_sessions
+  for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users can update own ai chat sessions" on public.ai_chat_sessions;
+create policy "Users can update own ai chat sessions"
+  on public.ai_chat_sessions
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users can delete own ai chat sessions" on public.ai_chat_sessions;
+create policy "Users can delete own ai chat sessions"
+  on public.ai_chat_sessions
   for delete
   to authenticated
   using (user_id = auth.uid());

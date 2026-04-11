@@ -181,6 +181,40 @@ export function CartClient({ perfumes, locale, supabase: supabaseConfig }: CartC
     };
   }, [supabase, session?.user]);
 
+  useEffect(() => {
+    if (!supabase || !session?.user?.id || typeof window === "undefined") return;
+
+    let isMounted = true;
+
+    const reloadCartFromEvent = async () => {
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("id,user_id,perfume_slug,size_ml,quantity,unit_price,created_at,updated_at")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) return;
+
+      if (error) {
+        setMessage(error.message || "An error occurred.");
+        return;
+      }
+
+      setCartRows((data as CartItemRow[] | null) ?? []);
+    };
+
+    const onCartUpdated = () => {
+      void reloadCartFromEvent();
+    };
+
+    window.addEventListener("perfoumer:cart-updated", onCartUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("perfoumer:cart-updated", onCartUpdated);
+    };
+  }, [supabase, session?.user?.id]);
+
   const perfumesBySlug = useMemo(() => new Map(perfumes.map((perfume) => [perfume.slug, perfume])), [perfumes]);
 
   const items = useMemo(
@@ -357,20 +391,20 @@ export function CartClient({ perfumes, locale, supabase: supabaseConfig }: CartC
                         type="button"
                         onClick={() => updateQuantity(row, quantity - 1)}
                         disabled={isBusy}
-                        className="grid h-8 w-8 place-items-center rounded-full text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-8 w-8 rounded-full text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label="Decrease quantity"
                       >
-                        -
+                        <span className="grid h-full w-full place-items-center">-</span>
                       </button>
                       <span className="inline-flex min-w-8 justify-center text-sm font-medium tabular-nums text-zinc-800">{quantity}</span>
                       <button
                         type="button"
                         onClick={() => updateQuantity(row, quantity + 1)}
                         disabled={isBusy}
-                        className="grid h-8 w-8 place-items-center rounded-full text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="h-8 w-8 rounded-full text-zinc-700 disabled:cursor-not-allowed disabled:opacity-50"
                         aria-label="Increase quantity"
                       >
-                        +
+                        <span className="grid h-full w-full place-items-center">+</span>
                       </button>
                     </div>
 

@@ -179,6 +179,44 @@ export function WishlistClient({ perfumes, locale, supabase: supabaseConfig }: W
     };
   }, [supabase, session?.user]);
 
+  useEffect(() => {
+    if (!supabase || !session?.user?.id || typeof window === "undefined") {
+      return;
+    }
+
+    let isMounted = true;
+
+    const reloadWishlistFromEvent = async () => {
+      const { data, error } = await supabase
+        .from("wishlists")
+        .select("user_id,perfume_slug,created_at")
+        .eq("user_id", session.user.id)
+        .order("created_at", { ascending: false });
+
+      if (!isMounted) {
+        return;
+      }
+
+      if (error) {
+        setMessage(error.message);
+        return;
+      }
+
+      setWishlists((data as WishlistRow[] | null) ?? []);
+    };
+
+    const onWishlistUpdated = () => {
+      void reloadWishlistFromEvent();
+    };
+
+    window.addEventListener("perfoumer:wishlist-updated", onWishlistUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("perfoumer:wishlist-updated", onWishlistUpdated);
+    };
+  }, [supabase, session?.user?.id]);
+
   const perfumesBySlug = useMemo(
     () => new Map(perfumes.map((perfume) => [perfume.slug, perfume])),
     [perfumes],

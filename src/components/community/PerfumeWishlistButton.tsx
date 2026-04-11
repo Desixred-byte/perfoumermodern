@@ -100,6 +100,37 @@ export function PerfumeWishlistButton({ perfumeSlug, locale, supabase: supabaseC
   }, [supabase, session?.user, perfumeSlug]);
 
   useEffect(() => {
+    if (!supabase || !session?.user?.id || typeof window === "undefined") {
+      return;
+    }
+
+    let isMounted = true;
+
+    const reloadWishlistState = async () => {
+      const { data } = await supabase
+        .from("wishlists")
+        .select("perfume_slug")
+        .eq("user_id", session.user.id)
+        .eq("perfume_slug", perfumeSlug)
+        .maybeSingle();
+
+      if (!isMounted) return;
+      setIsInWishlist(Boolean(data));
+    };
+
+    const onWishlistUpdated = () => {
+      void reloadWishlistState();
+    };
+
+    window.addEventListener("perfoumer:wishlist-updated", onWishlistUpdated);
+
+    return () => {
+      isMounted = false;
+      window.removeEventListener("perfoumer:wishlist-updated", onWishlistUpdated);
+    };
+  }, [supabase, session?.user?.id, perfumeSlug]);
+
+  useEffect(() => {
     if (!buttonFx) {
       return;
     }

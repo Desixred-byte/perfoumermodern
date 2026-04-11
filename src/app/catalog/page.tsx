@@ -25,18 +25,46 @@ export const metadata: Metadata = {
 };
 
 type CatalogPageProps = {
-  searchParams: Promise<{ brand?: string }>;
+  searchParams: Promise<{ brand?: string; q?: string; note?: string }>;
 };
+
+function noteLabelFromSlug(slug: string): string {
+  return slug
+    .split("-")
+    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
+    .join(" ");
+}
 
 export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const perfumes = await getPerfumes();
-  const { brand } = await searchParams;
+  const { brand, q, note } = await searchParams;
   const normalizedBrand = brand?.trim().toLowerCase();
+  const initialQuery = typeof q === "string" ? q.trim() : "";
+  const normalizedNote = typeof note === "string" ? note.trim().toLowerCase() : "";
   const initialBrand =
     perfumes.find((perfume) => perfume.brand.toLowerCase() === normalizedBrand)?.brand ??
     "all";
+
+  const noteType: "top" | "heart" | "base" | null = normalizedNote
+    ? perfumes.some((perfume) => perfume.noteSlugs.top.includes(normalizedNote))
+      ? "top"
+      : perfumes.some((perfume) => perfume.noteSlugs.heart.includes(normalizedNote))
+        ? "heart"
+        : perfumes.some((perfume) => perfume.noteSlugs.base.includes(normalizedNote))
+          ? "base"
+          : null
+    : null;
+
+  const lockedNoteFilter =
+    noteType && normalizedNote
+      ? {
+          slug: normalizedNote,
+          type: noteType,
+          label: noteLabelFromSlug(normalizedNote),
+        }
+      : undefined;
 
   return (
     <div className="bg-[#f3f3f2]">
@@ -54,7 +82,13 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           </div>
         </section>
 
-        <CatalogClient perfumes={perfumes} initialBrand={initialBrand} locale={locale} />
+        <CatalogClient
+          perfumes={perfumes}
+          lockedNoteFilter={lockedNoteFilter}
+          initialBrand={initialBrand}
+          initialQuery={initialQuery}
+          locale={locale}
+        />
       </main>
 
       <Footer locale={locale} />

@@ -74,12 +74,6 @@
   border-top-right-radius: 999px;
   border-bottom-right-radius: 999px;
 }
-.cart-pill-btn:hover:not(:disabled) {
-  background: linear-gradient(120deg, #f3f3f2 0%, #e0e0de 100%);
-  color: #111;
-  box-shadow: 0 6px 18px rgba(40, 40, 40, 0.13);
-  transform: scale(1.08);
-}
 .cart-pill-btn:active:not(:disabled) {
   background: #ececec;
   color: #232323;

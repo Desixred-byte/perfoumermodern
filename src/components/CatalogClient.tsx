@@ -34,6 +34,7 @@ type CatalogClientProps = {
   perfumes: Perfume[];
   lockedNoteFilter?: LockedNoteFilter;
   initialBrand?: string;
+  initialQuery?: string;
   locale: Locale;
 };
 
@@ -158,12 +159,14 @@ export function CatalogClient({
   perfumes,
   lockedNoteFilter,
   initialBrand = "all",
+  initialQuery = "",
   locale,
 }: CatalogClientProps) {
   const t = getDictionary(locale);
-  const [query, setQuery] = useState("");
-  const [draftQuery, setDraftQuery] = useState("");
-  const [suggestionQuery, setSuggestionQuery] = useState("");
+  const normalizedInitialQuery = initialQuery.trim();
+  const [query, setQuery] = useState(normalizedInitialQuery);
+  const [draftQuery, setDraftQuery] = useState(normalizedInitialQuery);
+  const [suggestionQuery, setSuggestionQuery] = useState(normalizedInitialQuery);
   const [selectedGender, setSelectedGender] = useState("all");
   const [selectedBrand, setSelectedBrand] = useState(initialBrand);
   const [selectedTopNote, setSelectedTopNote] = useState(
@@ -197,6 +200,14 @@ export function CatalogClient({
     setSelectedHeartNote(lockedHeartNote);
     setSelectedBaseNote(lockedBaseNote);
   }, [lockedTopNote, lockedHeartNote, lockedBaseNote]);
+
+  useEffect(() => {
+    const nextQuery = initialQuery.trim();
+    setQuery(nextQuery);
+    setDraftQuery(nextQuery);
+    setSuggestionQuery(nextQuery);
+    setVisibleCount(PAGE_SIZE);
+  }, [initialQuery]);
 
   const triggerRefresh = () => {
     setVisibleCount(PAGE_SIZE);

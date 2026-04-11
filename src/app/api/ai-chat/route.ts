@@ -1,10 +1,39 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { createClient } from "@supabase/supabase-js";
 
 type ChatRequest = {
   message: string;
   locale: string;
+  pageContext?: {
+    pathname?: string;
+    currentPerfumeSlug?: string;
+  };
+  userContext?: {
+    signedIn?: boolean;
+    email?: string;
+    username?: string;
+    profileGender?: string;
+    device?: {
+      userAgent?: string;
+      platform?: string;
+      language?: string;
+      timezone?: string;
+    };
+    wishlistSlugs?: string[];
+    cartItems?: Array<{
+      perfumeSlug?: string;
+      quantity?: number;
+      sizeMl?: number;
+      unitPrice?: number;
+    }>;
+    comments?: Array<{
+      perfumeSlug?: string;
+      rating?: number;
+      createdAt?: string;
+    }>;
+  };
   messages?: Array<{
     role: "user" | "assistant";
     text: string;
@@ -27,7 +56,38 @@ type StructuredFollowUp = {
 type StructuredAssistantResponse = {
   answer: string;
   followUp: StructuredFollowUp;
+  actionSuggestions?: ActionSuggestion[];
 };
+
+type ActionType = "add_to_cart" | "add_to_wishlist" | "remove_from_cart" | "clear_cart" | "remove_from_wishlist";
+
+type ActionSuggestion = {
+  id: string;
+  type: ActionType;
+  perfumeSlug: string;
+  perfumeName: string;
+  sizeMl?: number;
+  quantity?: number;
+  unitPrice?: number;
+  reason: string;
+};
+
+type FollowUpIntent =
+  | "recommendation"
+  | "orders"
+  | "shipping_payment"
+  | "returns"
+  | "account"
+  | "general";
+
+type GiftDiscoverySignals = {
+  recipientKnown: boolean;
+  occasionKnown: boolean;
+  scentKnown: boolean;
+  budgetKnown: boolean;
+};
+
+type GiftDiscoveryStep = "recipient" | "occasion" | "scent" | "budget" | null;
 
 type Perfume = {
   id: string;
@@ -45,12 +105,52 @@ type Perfume = {
   };
 };
 
+type SanitizedUserContext = {
+  signedIn: boolean;
+  email: string;
+  username: string;
+  profileGender: string;
+  device: {
+    userAgent: string;
+    platform: string;
+    language: string;
+    timezone: string;
+  };
+  wishlistSlugs: string[];
+  cartItems: Array<{ perfumeSlug: string; quantity: number; sizeMl: number; unitPrice: number }>;
+  comments: Array<{ perfumeSlug: string; rating: number; createdAt: string }>;
+};
+
+type ActionIntent = ActionType | null;
+
+type SanitizedPageContext = {
+  pathname: string;
+  currentPerfumeSlug: string;
+};
+
 let cachedPerfumes: Perfume[] = [];
 const DAILY_VARIATION_SEED = new Date().toISOString().slice(0, 10);
 const SUPPORT_EMAIL = "info@perfoumer.az";
 const SUPPORT_WHATSAPP = "+994 50 707 80 70";
 const DEVELOPER_WHATSAPP_URL = "https://wa.me/bakhishov";
 const DEVELOPER_PHONE = "+994 55 575 77 77";
+const NOTE_ALIAS_BY_SLUG: Record<string, string[]> = {
+  berqamot: ["berqamot", "bergamot"],
+  limon: ["limon", "lemon"],
+  lavanda: ["lavanda", "lavender"],
+  vanil: ["vanil", "vanilla"],
+  qizilgul: ["qizilgul", "qızılgül", "rose"],
+  yasemen: ["yasemen", "jasmine", "jasmin"],
+  sidr: ["sidr", "cedar"],
+  sandal: ["sandal", "sandalwood"],
+  musk: ["musk", "musc", "musc"],
+  müşk: ["musk", "musc", "musc", "müşk"],
+  paçuli: ["patchouli", "paculi", "paçuli"],
+  paculi: ["patchouli", "paculi", "paçuli"],
+  enber: ["enber", "ənbər", "amber"],
+  ənbər: ["enber", "ənbər", "amber"],
+  ud: ["ud", "oud", "oudh", "agarwood"],
+};
 
 async function loadPerfumes(): Promise<Perfume[]> {
   if (cachedPerfumes.length > 0) return cachedPerfumes;
@@ -130,6 +230,720 @@ function perfumeSizesSummary(perfume: Perfume): string {
     .slice(0, 4)
     .map((size) => `${size.ml}ml ${size.price} AZN`)
     .join(", ");
+}
+
+function sanitizeSlug(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "");
+}
+
+function sanitizeUserContext(input: unknown): SanitizedUserContext | null {
+  if (!input || typeof input !== "object") return null;
+
+  const raw = input as NonNullable<ChatRequest["userContext"]>;
+  const wishlistSlugs = Array.isArray(raw.wishlistSlugs)
+    ? Array.from(new Set(raw.wishlistSlugs.map(sanitizeSlug).filter(Boolean))).slice(0, 60)
+    : [];
+  const cartItems = Array.isArray(raw.cartItems)
+    ? raw.cartItems
+        .map((item) => ({
+          perfumeSlug: sanitizeSlug(item?.perfumeSlug),
+          quantity: Number.isFinite(Number(item?.quantity)) ? Math.max(1, Math.min(50, Number(item?.quantity))) : 1,
+          sizeMl: Number.isFinite(Number(item?.sizeMl)) ? Math.max(0, Math.min(500, Number(item?.sizeMl))) : 0,
+          unitPrice: Number.isFinite(Number(item?.unitPrice)) ? Math.max(0, Number(item?.unitPrice)) : 0,
+        }))
+        .filter((item) => item.perfumeSlug)
+        .slice(0, 100)
+    : [];
+  const comments = Array.isArray(raw.comments)
+    ? raw.comments
+        .map((item) => ({
+          perfumeSlug: sanitizeSlug(item?.perfumeSlug),
+          rating: Number.isFinite(Number(item?.rating)) ? Math.max(1, Math.min(5, Number(item?.rating))) : 0,
+          createdAt: typeof item?.createdAt === "string" ? item.createdAt.trim().slice(0, 40) : "",
+        }))
+        .filter((item) => item.perfumeSlug)
+        .slice(0, 80)
+    : [];
+
+  const device = raw.device && typeof raw.device === "object" ? raw.device : {};
+
+  return {
+    signedIn: Boolean(raw.signedIn),
+    email: typeof raw.email === "string" ? raw.email.trim().slice(0, 120) : "",
+    username: typeof raw.username === "string" ? raw.username.trim().slice(0, 80) : "",
+    profileGender: typeof raw.profileGender === "string" ? raw.profileGender.trim().slice(0, 40) : "",
+    device: {
+      userAgent: typeof device.userAgent === "string" ? device.userAgent.trim().slice(0, 180) : "",
+      platform: typeof device.platform === "string" ? device.platform.trim().slice(0, 80) : "",
+      language: typeof device.language === "string" ? device.language.trim().slice(0, 40) : "",
+      timezone: typeof device.timezone === "string" ? device.timezone.trim().slice(0, 80) : "",
+    },
+    wishlistSlugs,
+    cartItems,
+    comments,
+  };
+}
+
+function sanitizePageContext(input: unknown): SanitizedPageContext {
+  if (!input || typeof input !== "object") {
+    return { pathname: "", currentPerfumeSlug: "" };
+  }
+
+  const raw = input as NonNullable<ChatRequest["pageContext"]>;
+  const pathname = typeof raw.pathname === "string" ? raw.pathname.trim().slice(0, 180) : "";
+  const currentPerfumeSlug = sanitizeSlug(raw.currentPerfumeSlug);
+
+  return {
+    pathname,
+    currentPerfumeSlug,
+  };
+}
+
+function stripSensitiveClientFields(context: SanitizedUserContext | null): SanitizedUserContext | null {
+  if (!context) return null;
+
+  return {
+    ...context,
+    signedIn: false,
+    email: "",
+    username: "",
+    profileGender: "",
+    wishlistSlugs: [],
+    cartItems: [],
+    comments: [],
+  };
+}
+
+async function resolveSecureUserContext(
+  request: Request,
+  fallbackContext: SanitizedUserContext | null
+): Promise<SanitizedUserContext | null> {
+  const authHeader = request.headers.get("authorization") ?? "";
+  const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+  const accessToken = tokenMatch?.[1]?.trim();
+
+  if (!accessToken) {
+    return stripSensitiveClientFields(fallbackContext);
+  }
+
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    return stripSensitiveClientFields(fallbackContext);
+  }
+
+  const supabase = createClient(url, anonKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+
+  const { data: userData, error: userError } = await supabase.auth.getUser(accessToken);
+  if (userError || !userData.user) {
+    return stripSensitiveClientFields(fallbackContext);
+  }
+
+  const user = userData.user;
+  const [wishlistRes, cartRes, commentsRes] = await Promise.all([
+    supabase
+      .from("wishlists")
+      .select("perfume_slug")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(60),
+    supabase
+      .from("cart_items")
+      .select("perfume_slug,quantity,size_ml,unit_price")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("comments")
+      .select("perfume_slug,rating,created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(80),
+  ]);
+
+  const metadata = user.user_metadata ?? {};
+
+  return {
+    signedIn: true,
+    email: user.email?.trim() ?? "",
+    username: typeof metadata.username === "string" ? metadata.username.trim().slice(0, 80) : "",
+    profileGender: typeof metadata.gender === "string" ? metadata.gender.trim().slice(0, 40) : "",
+    device: fallbackContext?.device ?? {
+      userAgent: "",
+      platform: "",
+      language: "",
+      timezone: "",
+    },
+    wishlistSlugs: ((wishlistRes.data ?? []) as Array<{ perfume_slug?: unknown }>)
+      .map((item) => sanitizeSlug(item.perfume_slug))
+      .filter(Boolean),
+    cartItems: ((cartRes.data ?? []) as Array<{ perfume_slug?: unknown; quantity?: unknown; size_ml?: unknown; unit_price?: unknown }>)
+      .map((item) => ({
+        perfumeSlug: sanitizeSlug(item.perfume_slug),
+        quantity: Number.isFinite(Number(item.quantity)) ? Math.max(1, Math.min(50, Number(item.quantity))) : 1,
+        sizeMl: Number.isFinite(Number(item.size_ml)) ? Math.max(0, Math.min(500, Number(item.size_ml))) : 0,
+        unitPrice: Number.isFinite(Number(item.unit_price)) ? Math.max(0, Number(item.unit_price)) : 0,
+      }))
+      .filter((item) => item.perfumeSlug),
+    comments: ((commentsRes.data ?? []) as Array<{ perfume_slug?: unknown; rating?: unknown; created_at?: unknown }>)
+      .map((item) => ({
+        perfumeSlug: sanitizeSlug(item.perfume_slug),
+        rating: Number.isFinite(Number(item.rating)) ? Math.max(1, Math.min(5, Number(item.rating))) : 0,
+        createdAt: typeof item.created_at === "string" ? item.created_at.trim().slice(0, 40) : "",
+      }))
+      .filter((item) => item.perfumeSlug),
+  };
+}
+
+function isSensitiveDataExfiltrationQuery(message: string): boolean {
+  const normalized = normalizeText(message);
+  const asksSecrets = /(api key|secret|token|password|jwt|private key|env\b|database dump|credentials|admin access)/iu.test(
+    normalized
+  );
+  const asksOtherUsers =
+    /(other users|another user|someone else|all users|başqa istifadəçi|других пользователей|чуж)/iu.test(normalized) &&
+    /(email|address|cart|wishlist|order|comment|profile|data|məlumat|данн)/iu.test(normalized);
+
+  return asksSecrets || asksOtherUsers;
+}
+
+function sensitiveDataRefusal(locale: string): string {
+  if (locale === "az") {
+    return "Bu tip həssas və ya digər istifadəçilərə aid məlumatı paylaşa bilmirəm. Öz hesabınızla bağlı suallarda kömək edə bilərəm.";
+  }
+  if (locale === "ru") {
+    return "Я не могу делиться чувствительными данными или данными других пользователей. Могу помочь с вашим собственным аккаунтом.";
+  }
+  return "I can't share sensitive data or other users' data. I can help with your own account and actions.";
+}
+
+function detectActionIntent(message: string): ActionIntent {
+  const normalized = normalizeText(message);
+
+  const removeVerb = /(remove|delete|clear|sil|cixar|çıxar|cixart|çıxart|убери|удали|очист)/iu.test(normalized);
+  const cartWord = /(cart|sebet|səbət|basket|корзин)/iu.test(normalized);
+  const wishlistWord = /(wishlist|istek siyah|istək siyah|избран|favorites?)/iu.test(normalized);
+
+  if (removeVerb && cartWord) {
+    if (/(all|hami|hamısı|hamisini|hamısını|все|entire|whole)/iu.test(normalized)) {
+      return "clear_cart";
+    }
+    return "remove_from_cart";
+  }
+
+  if (removeVerb && wishlistWord) {
+    return "remove_from_wishlist";
+  }
+
+  const addCartIntent =
+    /(add|elave et|əlavə et|qoy|at|dobav|добав|добавь|append|put)/iu.test(normalized) &&
+    cartWord;
+  if (addCartIntent) return "add_to_cart";
+
+  const addWishlistIntent =
+    /(add|elave et|əlavə et|save|saxla|dobav|добав|добавь)/iu.test(normalized) &&
+    wishlistWord;
+  if (addWishlistIntent) return "add_to_wishlist";
+
+  return null;
+}
+
+function isBulkActionRequest(message: string): boolean {
+  const normalized = normalizeText(message);
+  const hasBulkWord = /(all|everything|entire|whole|hami|hamisi|hamisini|hamısını|butun|bütün|все|всё|полностью)/iu.test(
+    normalized
+  );
+  const hasActionWord = /(add|remove|delete|clear|elave|əlavə|sil|cixar|çıxar|добав|удал|очист|save)/iu.test(normalized);
+  const hasTargetWord = /(cart|sebet|səbət|basket|корзин|wishlist|istek siyah|istək siyah|избран|favorites?)/iu.test(
+    normalized
+  );
+
+  return hasBulkWord && hasActionWord && hasTargetWord;
+}
+
+function bulkActionBlockedReply(locale: string): string {
+  if (locale === "az") {
+    return "Təhlükəsizlik səbəbilə toplu əməliyyatları (hamısını əlavə et/sil) AI ilə icra etmirəm. İstəsəniz bunu tək-tək məhsullar üzrə edə bilərəm.";
+  }
+  if (locale === "ru") {
+    return "По соображениям безопасности я не выполняю массовые действия через AI (добавить/удалить всё). Могу сделать это по товарам по одному.";
+  }
+  return "For safety, I don't execute bulk actions through AI (add/remove everything). I can do it item by item.";
+}
+
+function isTotalStockCountQuestion(message: string): boolean {
+  const normalized = normalizeText(message);
+  const asksStock = /(in stock|stok|stoc|stockda|movcud|mövcud|availability|налич|в наличии)/iu.test(normalized);
+  const asksTotal = /(total|overall|all|how many|count|sayi|sayı|nece|neçə|общ|сколько)/iu.test(normalized);
+  const narrowsByBrand = /(brand|brend|marka|ysl|dior|chanel|tom ford|ajmal|armaf|valentino|roberto cavalli)/iu.test(
+    normalized
+  );
+
+  return asksStock && asksTotal && !narrowsByBrand;
+}
+
+function totalStockBlockedReply(locale: string): string {
+  if (locale === "az") {
+    return "Ümumi stok sayını paylaşmıram. İstəsəniz brend və ya məhsul üzrə mövcudluğu yoxlaya bilərəm.";
+  }
+  if (locale === "ru") {
+    return "Я не раскрываю общий остаток по складу. Могу проверить наличие по бренду или конкретному товару.";
+  }
+  return "I don't disclose total inventory counts. I can check availability by brand or specific product.";
+}
+
+function pickCartPerfumeForAction(
+  message: string,
+  perfumes: Perfume[],
+  userContext: SanitizedUserContext,
+  pageContext: SanitizedPageContext
+): Perfume | null {
+  const cartSlugSet = new Set(userContext.cartItems.map((item) => item.perfumeSlug));
+  const inCartPerfumes = perfumes.filter((perfume) => cartSlugSet.has(perfume.slug));
+  if (!inCartPerfumes.length) return null;
+
+  if (pageContext.currentPerfumeSlug && cartSlugSet.has(pageContext.currentPerfumeSlug)) {
+    const normalized = normalizeText(message);
+    const refersToCurrentItem = /(this|bu|этот|эту|current|hazirki|hazırki)/iu.test(normalized);
+    if (refersToCurrentItem || pageContext.pathname.startsWith("/perfumes/")) {
+      return inCartPerfumes.find((perfume) => perfume.slug === pageContext.currentPerfumeSlug) ?? null;
+    }
+  }
+
+  const ranked = inCartPerfumes
+    .map((perfume) => ({ perfume, score: scorePerfume(perfume, message) }))
+    .sort((left, right) => right.score - left.score);
+
+  if (!ranked.length) return null;
+  if ((ranked[0]?.score ?? 0) > 80) {
+    return ranked[0]?.perfume ?? null;
+  }
+
+  return inCartPerfumes.length === 1 ? inCartPerfumes[0] ?? null : null;
+}
+
+function humanizeSlug(slug: string): string {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part[0] ? part[0].toUpperCase() + part.slice(1) : part)
+    .join(" ");
+}
+
+function pickCartSlugFromContext(
+  message: string,
+  userContext: SanitizedUserContext,
+  pageContext: SanitizedPageContext
+): { perfumeSlug: string; sizeMl: number } | null {
+  if (!userContext.cartItems.length) return null;
+
+  if (pageContext.currentPerfumeSlug) {
+    const byPage = userContext.cartItems.find((item) => item.perfumeSlug === pageContext.currentPerfumeSlug);
+    if (byPage) {
+      return { perfumeSlug: byPage.perfumeSlug, sizeMl: byPage.sizeMl };
+    }
+  }
+
+  const normalized = normalizeText(message);
+  const scored = userContext.cartItems
+    .map((item) => ({
+      item,
+      score: normalizeText(item.perfumeSlug).split("-").reduce((sum, token) => {
+        if (token.length < 3) return sum;
+        return normalized.includes(token) ? sum + token.length : sum;
+      }, 0),
+    }))
+    .sort((left, right) => right.score - left.score);
+
+  if ((scored[0]?.score ?? 0) > 0) {
+    return { perfumeSlug: scored[0]!.item.perfumeSlug, sizeMl: scored[0]!.item.sizeMl };
+  }
+
+  if (userContext.cartItems.length === 1) {
+    const only = userContext.cartItems[0]!;
+    return { perfumeSlug: only.perfumeSlug, sizeMl: only.sizeMl };
+  }
+
+  return null;
+}
+
+function bestPerfumeForAction(message: string, perfumes: Perfume[]): Perfume | null {
+  const ranked = perfumes
+    .map((perfume) => ({ perfume, score: scorePerfume(perfume, message) }))
+    .sort((left, right) => right.score - left.score);
+
+  if (!ranked.length) return null;
+  if ((ranked[0]?.score ?? 0) < 120) return null;
+  return ranked[0]?.perfume ?? null;
+}
+
+function pickPerfumeForAction(message: string, perfumes: Perfume[], pageContext: SanitizedPageContext): Perfume | null {
+  const perfumeBySlug = new Map(perfumes.map((perfume) => [perfume.slug, perfume]));
+  const normalized = normalizeText(message);
+  const refersToCurrentItem = /(this|bu|этот|эту|current|hazirki|hazırki)/iu.test(normalized);
+  const onPerfumeDetailPage = pageContext.pathname.startsWith("/perfumes/");
+
+  if (pageContext.currentPerfumeSlug && (refersToCurrentItem || onPerfumeDetailPage)) {
+    const currentPerfume = perfumeBySlug.get(pageContext.currentPerfumeSlug);
+    if (currentPerfume) return currentPerfume;
+  }
+
+  return bestPerfumeForAction(message, perfumes);
+}
+
+function parseRequestedQuantity(message: string): number {
+  const normalized = normalizeText(message);
+  const direct = normalized.match(/\b(\d{1,2})\b/u);
+  if (!direct) return 1;
+  return Math.max(1, Math.min(10, Number(direct[1])));
+}
+
+function parseRequestedSizeMl(message: string, perfume: Perfume): number {
+  const normalized = normalizeText(message);
+  const explicit = normalized.match(/\b(\d{2,3})\s?(ml|m l)\b/iu);
+  const available = perfume.sizes.map((size) => size.ml).sort((a, b) => a - b);
+  if (!available.length) return 0;
+
+  if (explicit) {
+    const requested = Number(explicit[1]);
+    const exact = available.find((size) => size === requested);
+    if (exact) return exact;
+  }
+
+  const preferred = available.find((size) => size >= 50) ?? available[Math.floor(available.length / 2)] ?? available[0];
+  return preferred;
+}
+
+function actionReasonText(locale: string, actionType: ActionType, perfumeName: string): string {
+  if (locale === "az") {
+    if (actionType === "add_to_cart") {
+      return `İstəsəniz ${perfumeName} məhsulunu bir kliklə səbətinizə əlavə edə bilərəm.`;
+    }
+    if (actionType === "add_to_wishlist") {
+      return `İstəsəniz ${perfumeName} məhsulunu bir kliklə wishlist-ə əlavə edə bilərəm.`;
+    }
+    if (actionType === "remove_from_cart") {
+      return `İstəsəniz ${perfumeName} məhsulunu səbətinizdən silə bilərəm.`;
+    }
+    if (actionType === "remove_from_wishlist") {
+      return `İstəsəniz ${perfumeName} məhsulunu wishlist-dən silə bilərəm.`;
+    }
+    return "İstəsəniz səbətinizdəki bütün məhsulları bir kliklə silə bilərəm.";
+  }
+  if (locale === "ru") {
+    if (actionType === "add_to_cart") {
+      return `Если хотите, могу в один клик добавить ${perfumeName} в корзину.`;
+    }
+    if (actionType === "add_to_wishlist") {
+      return `Если хотите, могу в один клик добавить ${perfumeName} в wishlist.`;
+    }
+    if (actionType === "remove_from_cart") {
+      return `Если хотите, могу удалить ${perfumeName} из корзины.`;
+    }
+    if (actionType === "remove_from_wishlist") {
+      return `Если хотите, могу удалить ${perfumeName} из wishlist.`;
+    }
+    return "Если хотите, могу очистить всю корзину в один клик.";
+  }
+  if (actionType === "add_to_cart") {
+    return `If you want, I can add ${perfumeName} to your cart in one tap.`;
+  }
+  if (actionType === "add_to_wishlist") {
+    return `If you want, I can add ${perfumeName} to your wishlist in one tap.`;
+  }
+  if (actionType === "remove_from_cart") {
+    return `If you want, I can remove ${perfumeName} from your cart.`;
+  }
+  if (actionType === "remove_from_wishlist") {
+    return `If you want, I can remove ${perfumeName} from your wishlist.`;
+  }
+  return "If you want, I can clear your entire cart in one tap.";
+}
+
+function buildDirectActionReply(locale: string, action: ActionSuggestion): string {
+  if (locale === "az") {
+    if (action.type === "add_to_cart") return `${action.perfumeName} üçün hazırdır. Təsdiqlə düyməsinə toxunun, səbətə əlavə edim.`;
+    if (action.type === "add_to_wishlist") return `${action.perfumeName} üçün hazırdır. Təsdiqlə düyməsinə toxunun, wishlist-ə əlavə edim.`;
+    if (action.type === "remove_from_cart") return `${action.perfumeName} üçün hazırdır. Təsdiqlə düyməsinə toxunun, səbətdən silim.`;
+    if (action.type === "remove_from_wishlist") return `${action.perfumeName} üçün hazırdır. Təsdiqlə düyməsinə toxunun, wishlist-dən silim.`;
+    return "Hazırdır. Təsdiqlə düyməsinə toxunun, səbəti tam təmizləyim.";
+  }
+
+  if (locale === "ru") {
+    if (action.type === "add_to_cart") return `Готово для ${action.perfumeName}. Нажмите подтверждение, и я добавлю в корзину.`;
+    if (action.type === "add_to_wishlist") return `Готово для ${action.perfumeName}. Нажмите подтверждение, и я добавлю в wishlist.`;
+    if (action.type === "remove_from_cart") return `Готово для ${action.perfumeName}. Нажмите подтверждение, и я удалю из корзины.`;
+    if (action.type === "remove_from_wishlist") return `Готово для ${action.perfumeName}. Нажмите подтверждение, и я удалю из wishlist.`;
+    return "Готово. Нажмите подтверждение, и я очищу всю корзину.";
+  }
+
+  if (action.type === "add_to_cart") return `Ready for ${action.perfumeName}. Tap approve and I will add it to cart.`;
+  if (action.type === "add_to_wishlist") return `Ready for ${action.perfumeName}. Tap approve and I will add it to wishlist.`;
+  if (action.type === "remove_from_cart") return `Ready for ${action.perfumeName}. Tap approve and I will remove it from cart.`;
+  if (action.type === "remove_from_wishlist") return `Ready for ${action.perfumeName}. Tap approve and I will remove it from wishlist.`;
+  return "Ready. Tap approve and I will clear your cart.";
+}
+
+function buildActionSuggestions(
+  message: string,
+  locale: string,
+  userContext: SanitizedUserContext | null,
+  perfumes: Perfume[],
+  pageContext: SanitizedPageContext
+): ActionSuggestion[] {
+  if (!userContext?.signedIn) return [];
+
+  const intent = detectActionIntent(message);
+  if (!intent) return [];
+
+  if (intent === "clear_cart") {
+    return [
+      {
+        id: "clear-cart-all",
+        type: "clear_cart",
+        perfumeSlug: "all",
+        perfumeName: locale === "az" ? "Bütün məhsullar" : locale === "ru" ? "Все товары" : "All items",
+        reason: actionReasonText(locale, "clear_cart", "all"),
+      },
+    ];
+  }
+
+  if (intent === "remove_from_cart") {
+    const targetPerfume = pickCartPerfumeForAction(message, perfumes, userContext, pageContext);
+    if (targetPerfume) {
+      const cartEntry = userContext.cartItems.find((item) => item.perfumeSlug === targetPerfume.slug);
+      return [
+        {
+          id: `remove-cart-${targetPerfume.slug}-${cartEntry?.sizeMl ?? 0}`,
+          type: "remove_from_cart",
+          perfumeSlug: targetPerfume.slug,
+          perfumeName: `${targetPerfume.brand} ${targetPerfume.name}`,
+          ...(cartEntry?.sizeMl ? { sizeMl: cartEntry.sizeMl } : {}),
+          reason: actionReasonText(locale, "remove_from_cart", `${targetPerfume.brand} ${targetPerfume.name}`),
+        },
+      ];
+    }
+
+    const targetFromContext = pickCartSlugFromContext(message, userContext, pageContext);
+    if (!targetFromContext) return [];
+
+    const readableName = humanizeSlug(targetFromContext.perfumeSlug);
+    return [
+      {
+        id: `remove-cart-${targetFromContext.perfumeSlug}-${targetFromContext.sizeMl ?? 0}`,
+        type: "remove_from_cart",
+        perfumeSlug: targetFromContext.perfumeSlug,
+        perfumeName: readableName,
+        ...(targetFromContext.sizeMl ? { sizeMl: targetFromContext.sizeMl } : {}),
+        reason: actionReasonText(locale, "remove_from_cart", readableName),
+      },
+    ];
+  }
+
+  if (intent === "remove_from_wishlist") {
+    const wishlistSlugSet = new Set(userContext.wishlistSlugs);
+    const wishlistedPerfumes = perfumes.filter((perfume) => wishlistSlugSet.has(perfume.slug));
+    const target = pickPerfumeForAction(message, wishlistedPerfumes, pageContext);
+    if (!target) return [];
+
+    return [
+      {
+        id: `remove-wishlist-${target.slug}`,
+        type: "remove_from_wishlist",
+        perfumeSlug: target.slug,
+        perfumeName: `${target.brand} ${target.name}`,
+        reason: actionReasonText(locale, "remove_from_wishlist", `${target.brand} ${target.name}`),
+      },
+    ];
+  }
+
+  const perfume = pickPerfumeForAction(message, perfumes, pageContext);
+  if (!perfume) return [];
+
+  if (intent === "add_to_wishlist") {
+    return [
+      {
+        id: `wishlist-${perfume.slug}`,
+        type: "add_to_wishlist",
+        perfumeSlug: perfume.slug,
+        perfumeName: `${perfume.brand} ${perfume.name}`,
+        reason: actionReasonText(locale, "add_to_wishlist", `${perfume.brand} ${perfume.name}`),
+      },
+    ];
+  }
+
+  const sizeMl = parseRequestedSizeMl(message, perfume);
+  const size = perfume.sizes.find((entry) => entry.ml === sizeMl) ?? perfume.sizes[0];
+  if (!size) return [];
+
+  return [
+    {
+      id: `cart-${perfume.slug}-${size.ml}`,
+      type: "add_to_cart",
+      perfumeSlug: perfume.slug,
+      perfumeName: `${perfume.brand} ${perfume.name}`,
+      sizeMl: size.ml,
+      quantity: parseRequestedQuantity(message),
+      unitPrice: size.price,
+      reason: actionReasonText(locale, "add_to_cart", `${perfume.brand} ${perfume.name}`),
+    },
+  ];
+}
+
+function shouldNudgeGuestSignUp(message: string): boolean {
+  const normalized = normalizeText(message);
+  const actionableRequest =
+    /(add|save|elave|əlavə|saxla|dobav|добав|checkout|buy|satin al|купить|track|izle|отслед|orders?|sifaris|заказ|account|hesab|аккаунт|wishlist|cart|sebet|səbət)/iu.test(
+      normalized
+    );
+  if (!actionableRequest) return false;
+
+  const stableSeed = hashString(`${DAILY_VARIATION_SEED}:${normalized}`) % 100;
+  return stableSeed < 34;
+}
+
+function guestSignUpNudge(locale: string): string {
+  if (locale === "az") {
+    return "Qısa qeydiyyatla mən sizin üçün səbətə və wishlist-ə birbaşa əlavə etmə, həmçinin sifariş izləmə köməkçisi kimi işləyə bilərəm. /login";
+  }
+  if (locale === "ru") {
+    return "После короткой регистрации я смогу добавлять товары в корзину и wishlist по вашему подтверждению и помогать с заказами. /login";
+  }
+  return "With a quick sign-up, I can add items to cart and wishlist for you (with approval) and help with order actions. /login";
+}
+
+function rankTasteSignals(userContext: SanitizedUserContext, perfumes: Perfume[]) {
+  const perfumeBySlug = new Map(perfumes.map((perfume) => [perfume.slug, perfume]));
+  const brandScore = new Map<string, number>();
+  const noteScore = new Map<string, number>();
+  const genderScore = new Map<string, number>();
+
+  const addPerfumeSignal = (slug: string, weight: number) => {
+    const perfume = perfumeBySlug.get(slug);
+    if (!perfume) return;
+
+    const brand = perfume.brand.trim();
+    if (brand) {
+      brandScore.set(brand, (brandScore.get(brand) ?? 0) + weight);
+    }
+
+    const gender = perfume.gender.trim();
+    if (gender) {
+      genderScore.set(gender, (genderScore.get(gender) ?? 0) + weight);
+    }
+
+    const notes = [
+      ...(perfume.noteSlugs?.top ?? []),
+      ...(perfume.noteSlugs?.heart ?? []),
+      ...(perfume.noteSlugs?.base ?? []),
+    ];
+    for (const note of notes) {
+      if (!note) continue;
+      noteScore.set(note, (noteScore.get(note) ?? 0) + weight);
+    }
+  };
+
+  for (const slug of userContext.wishlistSlugs) {
+    addPerfumeSignal(slug, 4);
+  }
+
+  for (const item of userContext.cartItems) {
+    addPerfumeSignal(item.perfumeSlug, Math.max(2, item.quantity));
+  }
+
+  for (const comment of userContext.comments) {
+    if (comment.rating >= 4) {
+      addPerfumeSignal(comment.perfumeSlug, 3);
+    } else if (comment.rating > 0 && comment.rating <= 2) {
+      addPerfumeSignal(comment.perfumeSlug, -1);
+    }
+  }
+
+  const sortMap = (map: Map<string, number>) =>
+    Array.from(map.entries())
+      .filter(([, score]) => score > 0)
+      .sort((left, right) => right[1] - left[1])
+      .map(([name]) => name);
+
+  return {
+    topBrands: sortMap(brandScore).slice(0, 5),
+    topNotes: sortMap(noteScore).slice(0, 8),
+    topGenders: sortMap(genderScore).slice(0, 3),
+  };
+}
+
+function buildPersonalizationContext(userContext: SanitizedUserContext | null, perfumes: Perfume[]): string {
+  if (!userContext) {
+    return "No user context provided. Treat as guest and do not assume account-specific data.";
+  }
+
+  const taste = rankTasteSignals(userContext, perfumes);
+  const cartLineCount = userContext.cartItems.length;
+  const cartQuantity = userContext.cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return [
+    `signed_in: ${userContext.signedIn ? "yes" : "no"}`,
+    userContext.email ? `email: ${userContext.email}` : "",
+    userContext.username ? `username: ${userContext.username}` : "",
+    userContext.profileGender ? `profile_gender (explicit only): ${userContext.profileGender}` : "",
+    userContext.device.language ? `device_language: ${userContext.device.language}` : "",
+    userContext.device.platform ? `device_platform: ${userContext.device.platform}` : "",
+    userContext.device.timezone ? `device_timezone: ${userContext.device.timezone}` : "",
+    `wishlist_count: ${userContext.wishlistSlugs.length}`,
+    `cart_line_count: ${cartLineCount}`,
+    `cart_total_quantity: ${cartQuantity}`,
+    `comment_count: ${userContext.comments.length}`,
+    taste.topBrands.length ? `preferred_brands: ${taste.topBrands.join(", ")}` : "",
+    taste.topNotes.length ? `preferred_notes: ${taste.topNotes.join(", ")}` : "",
+    taste.topGenders.length ? `preferred_gender_buckets: ${taste.topGenders.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function isCartCountQuestion(message: string): boolean {
+  const normalized = normalizeText(message);
+  return /(how many|nece|neçə|skolko|count|sayi|sayi|колич)/iu.test(normalized) && /(cart|sebet|səbət|basket|корзин)/iu.test(normalized);
+}
+
+function buildCartCountReply(locale: string, totalQuantity: number, lineCount: number): string {
+  if (locale === "az") {
+    if (lineCount === 0) return "Hazırda səbətiniz boş görünür.";
+    return `Hazırda səbətinizdə ${lineCount} məhsul növü var, ümumi say isə ${totalQuantity}-dir.`;
+  }
+  if (locale === "ru") {
+    if (lineCount === 0) return "Сейчас ваша корзина выглядит пустой.";
+    return `Сейчас в вашей корзине ${lineCount} позиций, общее количество — ${totalQuantity}.`;
+  }
+  if (lineCount === 0) return "Your cart looks empty right now.";
+  return `You currently have ${lineCount} cart lines with a total quantity of ${totalQuantity}.`;
+}
+
+function isCartTotalQuestion(message: string): boolean {
+  const normalized = normalizeText(message);
+  return /(how much|total|worth|qiymet|qiymət|cemi|cəmi|sum|итог|общ|стоим)/iu.test(normalized) && /(cart|sebet|səbət|basket|корзин)/iu.test(normalized);
+}
+
+function buildCartTotalReply(locale: string, totalAmount: number, lineCount: number): string {
+  const rounded = Number.isFinite(totalAmount) ? Number(totalAmount.toFixed(2)) : 0;
+  if (locale === "az") {
+    if (lineCount === 0) return "Hazırda səbətiniz boşdur.";
+    return `Hazırda səbətinizin ümumi məbləği ${rounded} ₼ təşkil edir.`;
+  }
+  if (locale === "ru") {
+    if (lineCount === 0) return "Сейчас ваша корзина пустая.";
+    return `Сейчас общая сумма вашей корзины составляет ${rounded} AZN.`;
+  }
+  if (lineCount === 0) return "Your cart is empty right now.";
+  return `Your current cart total is ${rounded} AZN.`;
 }
 
 const FACET_KEYWORDS: Record<string, string[]> = {
@@ -377,7 +1191,7 @@ function normalizeStructuredResponse(content: string | undefined): StructuredAss
   };
 
   if (!content) {
-    return { answer: "", followUp: emptyFollowUp };
+    return { answer: "", followUp: emptyFollowUp, actionSuggestions: [] };
   }
 
   try {
@@ -398,6 +1212,12 @@ function normalizeStructuredResponse(content: string | undefined): StructuredAss
       typeof rawFollowUp === "object" && rawFollowUp && typeof rawFollowUp.inputPlaceholder === "string"
         ? rawFollowUp.inputPlaceholder.trim().slice(0, 90)
         : "";
+    const actionSuggestions =
+      Array.isArray(parsed.actionSuggestions)
+        ? parsed.actionSuggestions
+            .filter((action): action is ActionSuggestion => Boolean(action) && typeof action === "object")
+            .slice(0, 2)
+        : [];
 
     return {
       answer,
@@ -407,11 +1227,13 @@ function normalizeStructuredResponse(content: string | undefined): StructuredAss
         allowFreeText,
         inputPlaceholder,
       },
+      actionSuggestions,
     };
   } catch {
     return {
       answer: content.trim(),
       followUp: emptyFollowUp,
+      actionSuggestions: [],
     };
   }
 }
@@ -439,187 +1261,738 @@ function sanitizeAssistantAnswer(value: string): string {
     .trim();
 }
 
+function getAllNoteSlugs(perfumes: Perfume[]): Set<string> {
+  const slugs = new Set<string>();
+  for (const perfume of perfumes) {
+    for (const slug of perfume.noteSlugs?.top ?? []) slugs.add(slug);
+    for (const slug of perfume.noteSlugs?.heart ?? []) slugs.add(slug);
+    for (const slug of perfume.noteSlugs?.base ?? []) slugs.add(slug);
+  }
+  return slugs;
+}
+
+function pickClosestAvailableSlug(preferredSlug: string, availableSlugs: Set<string>): string | null {
+  if (availableSlugs.has(preferredSlug)) return preferredSlug;
+
+  const preferred = normalizeText(humanizeToken(preferredSlug));
+  const candidates = Array.from(availableSlugs)
+    .map((slug) => ({ slug, normalized: normalizeText(humanizeToken(slug)) }))
+    .filter((entry) => entry.normalized === preferred || entry.normalized.includes(preferred))
+    .sort((left, right) => {
+      if (left.slug.length !== right.slug.length) return left.slug.length - right.slug.length;
+      return left.slug.localeCompare(right.slug);
+    });
+
+  return candidates[0]?.slug ?? null;
+}
+
+function resolveRequestedNoteSlug(message: string, perfumes: Perfume[]): string | null {
+  const normalizedMessage = normalizeText(message);
+  if (!normalizedMessage) return null;
+  const normalizedWords = new Set(normalizedMessage.split(" ").filter(Boolean));
+
+  const availableSlugs = getAllNoteSlugs(perfumes);
+
+  for (const [slug, aliases] of Object.entries(NOTE_ALIAS_BY_SLUG)) {
+    if (
+      aliases.some((alias) => {
+        const normalizedAlias = normalizeText(alias);
+        if (!normalizedAlias) return false;
+
+        // Short aliases must match a full token to avoid false positives like "got" -> "ot".
+        if (normalizedAlias.length < 4) {
+          return normalizedWords.has(normalizedAlias);
+        }
+
+        return normalizedMessage.includes(normalizedAlias);
+      })
+    ) {
+      const canonical = pickClosestAvailableSlug(slug, availableSlugs);
+      if (canonical) return canonical;
+    }
+  }
+
+  const sortedSlugs = Array.from(availableSlugs).sort((left, right) => right.length - left.length);
+  for (const slug of sortedSlugs) {
+    const normalizedSlug = normalizeText(humanizeToken(slug));
+    if (!normalizedSlug) continue;
+
+    if (normalizedSlug.length < 4) {
+      if (normalizedWords.has(normalizedSlug)) {
+        return slug;
+      }
+      continue;
+    }
+
+    if (normalizedSlug.includes(" ")) {
+      if (normalizedMessage.includes(normalizedSlug)) {
+        return slug;
+      }
+      continue;
+    }
+
+    if (normalizedWords.has(normalizedSlug)) {
+      return slug;
+    }
+  }
+
+  return null;
+}
+
+function hasExplicitNoteIntent(message: string): boolean {
+  const normalizedMessage = normalizeText(message);
+  if (!normalizedMessage) return false;
+
+  if (/(note|notes|nota|notu|нот|ноты|верхние|сердечные|базовые)/iu.test(normalizedMessage)) {
+    return true;
+  }
+
+  // Also treat explicit mention of known note aliases as note intent.
+  return Object.values(NOTE_ALIAS_BY_SLUG).some((aliases) =>
+    aliases.some((alias) => {
+      const normalizedAlias = normalizeText(alias);
+      if (!normalizedAlias) return false;
+      if (normalizedAlias.length < 4) return false;
+      return normalizedMessage.includes(normalizedAlias);
+    })
+  );
+}
+
+function appendNoteCatalogLink(answer: string, locale: string, noteSlug: string): string {
+  if (!answer) return answer;
+  if (/\/catalog\b/iu.test(answer)) return answer;
+  if (/\/catalog\?note=/iu.test(answer)) return answer;
+
+  const path = `/catalog?note=${encodeURIComponent(noteSlug)}`;
+
+  if (locale === "az") {
+    return `${answer}\n\nBu nota görə filtrlənmiş kataloq: ${path}`;
+  }
+  if (locale === "ru") {
+    return `${answer}\n\nКаталог с фильтром по этой ноте: ${path}`;
+  }
+  return `${answer}\n\nFiltered catalog for this note: ${path}`;
+}
+
+function detectFollowUpIntent(message: string): FollowUpIntent {
+  const normalized = normalizeText(message);
+
+  if (/(ətir|qoxu|parfum|perfume|fragrance|аромат|дух)/iu.test(normalized)) {
+    return "recommendation";
+  }
+  if (/(order|sifaris|заказ|orders)/iu.test(normalized)) {
+    return "orders";
+  }
+  if (/(shipping|catdirilma|dostavka|delivery|odeni[sş]|payment|oplata|track|izle)/iu.test(normalized)) {
+    return "shipping_payment";
+  }
+  if (/(qaytar|return|возврат|refund)/iu.test(normalized)) {
+    return "returns";
+  }
+  if (/(hesab|account|akkaunt|кабинет|profil|profile)/iu.test(normalized)) {
+    return "account";
+  }
+
+  return "general";
+}
+
+function isGiftIntentMessage(message: string): boolean {
+  const normalized = normalizeText(message);
+
+  if (/(gift|hediyye|hədiyyə|podarok|подар)/iu.test(normalized)) {
+    return true;
+  }
+
+  return /(for my|for a|ucun|üçün|для|моей|моему)/iu.test(normalized)
+    && /(daughter|son|wife|husband|mother|mom|father|dad|friend|girlfriend|boyfriend|qizim|qızım|oglum|oğlum|anam|atam|arvadim|dostum|дочь|сын|жена|муж|мама|папа|друг|подруга)/iu.test(
+      normalized
+    );
+}
+
+function hasActiveGiftFlow(body: ChatRequest): boolean {
+  const history = Array.isArray(body.messages) ? body.messages : [];
+  const recentAssistant = history.filter((entry) => entry.role === "assistant").slice(-4);
+
+  return recentAssistant.some((entry) => {
+    const followUpQuestion = typeof entry.followUp?.question === "string" ? entry.followUp.question : "";
+    const combined = `${entry.text || ""} ${followUpQuestion}`;
+    return /(gift|hediyye|hədiyyə|podarok|подар)/iu.test(normalizeText(combined));
+  });
+}
+
+function getLastAssistantGiftFollowUpQuestion(body: ChatRequest): string {
+  const history = Array.isArray(body.messages) ? body.messages : [];
+
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const entry = history[index];
+    if (entry.role !== "assistant") continue;
+    const question = typeof entry.followUp?.question === "string" ? entry.followUp.question.trim() : "";
+    if (!question) continue;
+
+    const combined = normalizeText(`${entry.text || ""} ${question}`);
+    if (/(gift|hediyye|hədiyyə|podarok|подар)/iu.test(combined)) {
+      return question;
+    }
+  }
+
+  return "";
+}
+
+function buildGiftContextText(body: ChatRequest): string {
+  const history = Array.isArray(body.messages) ? body.messages : [];
+  const userMessages = history
+    .filter((entry) => entry.role === "user" && typeof entry.text === "string")
+    .slice(-8)
+    .map((entry) => entry.text.trim())
+    .filter(Boolean);
+
+  return normalizeText(userMessages.join(" "));
+}
+
+function detectGiftDiscoverySignals(text: string): GiftDiscoverySignals {
+  const recipientKnown = /(daughter|son|wife|husband|mother|mom|father|dad|friend|girlfriend|boyfriend|qizim|qızım|oglum|oğlum|anam|atam|arvadim|dostum|дочь|сын|жена|муж|мама|папа|друг|подруга|for my|ucun|üçün|для)/iu.test(
+    text
+  );
+  const occasionKnown = /(birthday|anniversary|wedding|date|party|office|daily|everyday|dogum gunu|doğum günü|toyun|nisan|nişan|gece|вечер|день рождения|свадь|юбилей|праздник)/iu.test(
+    text
+  );
+  const scentKnown = /(fresh|sweet|spicy|woody|floral|citrus|vanilla|oud|musky|light|heavy|clean|sirin|şirin|ədviyyat|agir|ağır|yungul|yüngül|temiz|təmiz|свеж|сладк|прян|древес|цветоч|цитрус|ванил|уд|мускус|легк|тяж)/iu.test(
+    text
+  );
+  const budgetKnown = /(azn|usd|eur|manat|rub|руб|\$|€|₼|\b\d{2,4}\b|under\s*\d+|up to\s*\d+|between\s*\d+|aralig|aralığ|araliginda|aralığında|budce|büdcə|бюджет)/iu.test(
+    text
+  );
+
+  return { recipientKnown, occasionKnown, scentKnown, budgetKnown };
+}
+
+function nextGiftDiscoveryStep(signals: GiftDiscoverySignals): GiftDiscoveryStep {
+  if (!signals.recipientKnown) return "recipient";
+  if (!signals.occasionKnown) return "occasion";
+  if (!signals.scentKnown) return "scent";
+  if (!signals.budgetKnown) return "budget";
+  return null;
+}
+
+function inferGiftStepFromQuestion(question: string): GiftDiscoveryStep {
+  const normalized = normalizeText(question);
+  if (!normalized) return null;
+
+  if (/(kim ucun|kim üçün|for who|who is|for whom|для кого|кому)/iu.test(normalized)) return "recipient";
+  if (/(hansi furset|hansı fürsət|occasion|which occasion|for what occasion|повод|случа)/iu.test(normalized)) return "occasion";
+  if (/(qoxu uslubu|qoxu üslubu|scent|fragrance profile|which scent|профиль аромата|аромат)/iu.test(normalized)) return "scent";
+  if (/(budce|büdcə|budget|price range|бюджет)/iu.test(normalized)) return "budget";
+
+  return null;
+}
+
+function applyGiftStepAnswerHeuristic(
+  signals: GiftDiscoverySignals,
+  askedStep: GiftDiscoveryStep,
+  latestUserMessage: string
+): GiftDiscoverySignals {
+  if (!askedStep) return signals;
+
+  const normalizedAnswer = normalizeText(latestUserMessage);
+  if (!normalizedAnswer) return signals;
+
+  if (askedStep === "recipient") {
+    return { ...signals, recipientKnown: true };
+  }
+  if (askedStep === "occasion") {
+    return { ...signals, occasionKnown: true };
+  }
+  if (askedStep === "scent") {
+    return { ...signals, scentKnown: true };
+  }
+  return { ...signals, budgetKnown: true };
+}
+
+function giftDiscoveryPreface(locale: string): string {
+  if (locale === "az") {
+    return "Əla, bunu birlikdə düzgün seçək. Ən yaxşı hədiyyə variantını tapmaq üçün qısa şəkildə bir-bir dəqiqləşdirəcəyəm.";
+  }
+  if (locale === "ru") {
+    return "Отлично, давайте подберем это точно. Чтобы дать уверенный результат, уточню несколько коротких вопросов по одному.";
+  }
+  return "Great, let's narrow this down properly. I'll ask a few short questions one by one so the final pick is accurate.";
+}
+
+function giftDiscoveryProgressReply(locale: string, nextStep: Exclude<GiftDiscoveryStep, null>): string {
+  if (locale === "az") {
+    if (nextStep === "occasion") return "Super. İndi fürsəti dəqiqləşdirək.";
+    if (nextStep === "scent") return "Yaxşıdır. İndi qoxu istiqamətini seçək.";
+    if (nextStep === "budget") return "Gözəl. Son olaraq büdcəni dəqiqləşdirək.";
+    return "Əla, davam edək.";
+  }
+  if (locale === "ru") {
+    if (nextStep === "occasion") return "Отлично. Теперь уточним повод.";
+    if (nextStep === "scent") return "Хорошо. Теперь выберем направление аромата.";
+    if (nextStep === "budget") return "Отлично. В конце уточним бюджет.";
+    return "Отлично, продолжим.";
+  }
+  if (nextStep === "occasion") return "Great. Now let's pin down the occasion.";
+  if (nextStep === "scent") return "Nice. Next, let's lock in the scent direction.";
+  if (nextStep === "budget") return "Perfect. Last step: budget range.";
+  return "Great, let's continue.";
+}
+
+function buildGiftDiscoveryFollowUp(locale: string, step: Exclude<GiftDiscoveryStep, null>): StructuredFollowUp {
+  if (locale === "az") {
+    if (step === "recipient") {
+      return {
+        question: "Hədiyyə kim üçündür?",
+        options: ["Qadın", "Kişi", "Unisex", "Dəqiq deyil"],
+        allowFreeText: true,
+        inputPlaceholder: "Məs: qızım, həyat yoldaşım, dostum",
+      };
+    }
+    if (step === "occasion") {
+      return {
+        question: "Hansı fürsət üçün düşünürsünüz?",
+        options: ["Ad günü", "Gündəlik istifadə", "Axşam tədbiri", "Xüsusi gün"],
+        allowFreeText: true,
+        inputPlaceholder: "Məs: ad günü hədiyyəsi",
+      };
+    }
+    if (step === "scent") {
+      return {
+        question: "Qoxu üslubu necə olsun?",
+        options: ["Fresh və təmiz", "Şirin və isti", "Ağır və qalıcı", "Yüngül və rahat"],
+        allowFreeText: true,
+        inputPlaceholder: "Məs: vanilli, çiçəkli, ədviyyatlı",
+      };
+    }
+
+    return {
+      question: "Büdcə aralığınız nə qədərdir?",
+      options: ["20-50 AZN", "50-100 AZN", "100-200 AZN", "200+ AZN"],
+      allowFreeText: true,
+      inputPlaceholder: "Məs: 80 AZN ətrafı",
+    };
+  }
+
+  if (locale === "ru") {
+    if (step === "recipient") {
+      return {
+        question: "Для кого подарок?",
+        options: ["Для женщины", "Для мужчины", "Унисекс", "Пока не уверен(а)"],
+        allowFreeText: true,
+        inputPlaceholder: "Например: для дочери, для супруги, для друга",
+      };
+    }
+    if (step === "occasion") {
+      return {
+        question: "Для какого случая?",
+        options: ["День рождения", "На каждый день", "Вечер/мероприятие", "Особый случай"],
+        allowFreeText: true,
+        inputPlaceholder: "Например: подарок на день рождения",
+      };
+    }
+    if (step === "scent") {
+      return {
+        question: "Какой профиль аромата ближе?",
+        options: ["Свежий и чистый", "Сладкий и теплый", "Насыщенный и стойкий", "Легкий и мягкий"],
+        allowFreeText: true,
+        inputPlaceholder: "Например: ванильный, цветочный, пряный",
+      };
+    }
+
+    return {
+      question: "Какой у вас бюджет?",
+      options: ["20-50 AZN", "50-100 AZN", "100-200 AZN", "200+ AZN"],
+      allowFreeText: true,
+      inputPlaceholder: "Например: около 80 AZN",
+    };
+  }
+
+  if (step === "recipient") {
+    return {
+      question: "Who is the gift for?",
+      options: ["Woman", "Man", "Unisex", "Not sure yet"],
+      allowFreeText: true,
+      inputPlaceholder: "Example: my daughter, my partner, my friend",
+    };
+  }
+  if (step === "occasion") {
+    return {
+      question: "What is the occasion?",
+      options: ["Birthday", "Daily wear", "Evening/event", "Special occasion"],
+      allowFreeText: true,
+      inputPlaceholder: "Example: birthday gift",
+    };
+  }
+  if (step === "scent") {
+    return {
+      question: "Which scent direction should we target?",
+      options: ["Fresh and clean", "Sweet and warm", "Bold and long-lasting", "Soft and light"],
+      allowFreeText: true,
+      inputPlaceholder: "Example: vanilla, floral, spicy",
+    };
+  }
+
+  return {
+    question: "What budget range should I use?",
+    options: ["20-50 AZN", "50-100 AZN", "100-200 AZN", "200+ AZN"],
+    allowFreeText: true,
+    inputPlaceholder: "Example: around 80 AZN",
+  };
+}
+
+function buildSmartFollowUp(locale: string, intent: FollowUpIntent): StructuredFollowUp {
+  if (locale === "az") {
+    if (intent === "recommendation") {
+      return {
+        question: "Seçimi dəqiqləşdirmək üçün hansına üstünlük verirsiniz?",
+        options: ["Gündəlik və yüngül", "Qalıcı və güclü", "Şirin və isti", "Fresh və təmiz"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "orders") {
+      return {
+        question: "Sifarişlə bağlı hansı hissə lazımdır?",
+        options: ["Sifarişlərimi haradan görüm?", "Sifariş izləmə", "Status nə vaxt yenilənir?"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "shipping_payment") {
+      return {
+        question: "Çatdırılma və ödənişdə hansı mövzu maraqlıdır?",
+        options: ["Standart çatdırılma", "Ekspress çatdırılma", "Ödəniş üsulları", "Çatdırılma müddəti"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "returns") {
+      return {
+        question: "Qaytarma ilə bağlı nəyi dəqiqləşdirək?",
+        options: ["Şərtlər", "Müddət", "Proses necə işləyir?"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "account") {
+      return {
+        question: "Hesab bölməsində nəyi tapmaq istəyirsiniz?",
+        options: ["Sifariş tarixçəsi", "Seçilmişlər", "Profil məlumatları"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+
+    return {
+      question: "Daha dəqiq kömək üçün hansı istiqamətdə davam edək?",
+      options: ["Ətir tövsiyəsi", "Sifariş və çatdırılma", "Qaytarma və ödəniş", "Hesab bölməsi"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+
+  if (locale === "ru") {
+    if (intent === "recommendation") {
+      return {
+        question: "Чтобы точнее подобрать аромат, какой стиль вам ближе?",
+        options: ["Легкий на каждый день", "Стойкий и насыщенный", "Сладкий и теплый", "Свежий и чистый"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "orders") {
+      return {
+        question: "Что именно нужно по заказу?",
+        options: ["Где смотреть заказы", "Отслеживание", "Когда обновляется статус"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "shipping_payment") {
+      return {
+        question: "Что важно по доставке и оплате?",
+        options: ["Стандартная доставка", "Экспресс доставка", "Способы оплаты", "Сроки доставки"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "returns") {
+      return {
+        question: "Что уточнить по возврату?",
+        options: ["Условия", "Сроки", "Как проходит процесс"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+    if (intent === "account") {
+      return {
+        question: "Что хотите найти в аккаунте?",
+        options: ["История заказов", "Избранное", "Данные профиля"],
+        allowFreeText: true,
+        inputPlaceholder: "",
+      };
+    }
+
+    return {
+      question: "В каком направлении продолжим?",
+      options: ["Подбор аромата", "Заказ и доставка", "Возврат и оплата", "Аккаунт"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+
+  if (intent === "recommendation") {
+    return {
+      question: "To refine recommendations, which profile sounds closer?",
+      options: ["Light everyday", "Strong and long-lasting", "Sweet and warm", "Fresh and clean"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+  if (intent === "orders") {
+    return {
+      question: "What do you need around your order?",
+      options: ["Where to view orders", "Order tracking", "Status updates"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+  if (intent === "shipping_payment") {
+    return {
+      question: "Which part of shipping and payment should I clarify?",
+      options: ["Standard shipping", "Express shipping", "Payment methods", "Delivery time"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+  if (intent === "returns") {
+    return {
+      question: "What would you like to confirm about returns?",
+      options: ["Conditions", "Time window", "How the process works"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+  if (intent === "account") {
+    return {
+      question: "What are you trying to find in your account?",
+      options: ["Order history", "Wishlist", "Profile details"],
+      allowFreeText: true,
+      inputPlaceholder: "",
+    };
+  }
+
+  return {
+    question: "What should we focus on next?",
+    options: ["Perfume recommendations", "Orders and shipping", "Returns and payment", "Account help"],
+    allowFreeText: true,
+    inputPlaceholder: "",
+  };
+}
+
 const systemPromptByLocale: Record<string, string> = {
-  az: `You are Remi, the official AI concierge for Perfoumer.az.
+  az: `Sen Remi-sən — Perfoumer.az üçün rəsmi AI konsiercisən.
 
-SCOPE:
-- You only help with Perfoumer topics: perfumes in the Perfoumer catalog, notes, brands, site navigation, account/orders, shipping, payment, returns, support, and the website experience.
-- If a user asks for unrelated topics, refuse briefly and redirect them back to Perfoumer.
+## ŞƏXSİYYƏT
+Sən parfüm dünyasını içindən tanıyan, həm sənətkarlığı, həm müştərini anlayan bir mütəxəssissan. Cavabların zərif, konkret və inamlıdır — nə çox danışırsan, nə də az. Sən bir butik konsiercisinə bənzəyirsən: düzünü deyirsən, lazımsız söz işlətmirsən.
 
-DEVELOPER CREDIT:
-- The Perfoumer website and this AI experience were developed by Bakhishov Brands.
-- Mention Bakhishov Brands when the user asks who built, created, or developed the website, chat, or AI.
-- Do not inject developer credit into unrelated answers.
-- If the user asks how to contact Bakhishov Brands or the developer, share WhatsApp ${DEVELOPER_WHATSAPP_URL} and phone ${DEVELOPER_PHONE}.
+## İŞ SAHƏSİ
+Yalnız bu mövzularda kömək edirsən:
+- Perfoumer kataloqunda olan ətirlər — notlar, brendlər, tövsiyələr, müqayisə
+- Sayt naviqasiyası, hesab, sifariş, ödəniş, çatdırılma, geri qaytarma, dəstək
+- Ümumi Perfoumer təcrübəsi
 
-RESPONSE QUALITY:
-- No greetings.
-- Sound intelligent, premium, direct, and natural.
-- Do not give generic filler.
-- Write polished Azerbaijani with correct grammar, spelling, punctuation, and capitalization.
-- Use lightweight formatting when it improves readability: **bold** for perfume names or key terms, numbered lists for ranked recommendations or step-by-step guidance, and bullet lists for short grouped points.
-- Keep formatting clean and purposeful, not excessive.
-- Never output raw HTML such as <a>, <br>, <p>, or any other tags.
-- For phone numbers, emails, and links, use plain text or markdown-style text only.
-- Never invent perfume names, links, notes, policies, or stock facts.
-- Never recommend a brand name alone as if it were a perfume.
-- For broad recommendation requests, suggest 2-4 varied options and explain why each fits.
-- Prefer exact catalog items from the provided context. If no exact catalog match exists, say that clearly and guide the user to /catalog.
-- Use internal paths when helpful: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug.
-- Only list real catalog perfumes as recommendations.
-- Do not turn note sections, budgets, headings, or categories into recommendation items.
-- When describing note structure, write it in prose instead of standalone pseudo-product lines such as "Üst notlar - ...".
-- Do not output naked standalone internal paths as separate lines unless the path itself is the whole answer.
+Mövzudan kənar suallar gəldikdə — bir cümlədə geri yönləndir. Izahat vermə, üzr istəmə.
 
-FOLLOW-UP QUESTIONS:
-- If one short clarification would materially improve the answer, ask exactly one follow-up question.
-- Use 2-4 short plain-text options when likely answer paths are clear.
-- Use free-text follow-ups when the user needs to specify details like budget, notes, season, intensity, occasion, or style.
-- Do not ask unnecessary questions if you can already answer well.
-- Never ask more than one follow-up at a time.
+## DEVELOPER KREDİTİ
+- Saytı və bu AI-ı **Bakhishov Brands** hazırlayıb.
+- Yalnız kimsə "kim hazırladı / kim qurdu" deyə soruşanda bu məlumatı ver.
+- Əlaqə üçün: WhatsApp ${DEVELOPER_WHATSAPP_URL} | Telefon: ${DEVELOPER_PHONE}
 
-OUTPUT FORMAT:
-- Return valid JSON only.
-- Use this shape exactly:
-  {
-    "answer": "markdown-friendly assistant reply",
-    "followUp": {
-      "question": "",
-      "options": [],
-      "allowFreeText": false,
-      "inputPlaceholder": ""
-    }
+## CAVAB KOKKEYTİ
+**Ton:** İntelligent, premium, birbaşa. Doldurucu ifadə yoxdur.
+**Dil:** Düzgün Azərbaycan dili — orfoqrafiya, durğu işarəsi, böyük hərf.
+**Format:**
+- **Qalın** — ətr adları və əsas terminlər üçün
+- Nömrəli siyahı — tövsiyə sıralaması və addım-addım izahat üçün
+- Markerlı siyahı — qısa qruplaşdırılmış məlumat üçün
+- HTML teqləri (<a>, <br>, <p>) heç vaxt işlət
+- Telefon, email, link — yalnız düz mətn və ya markdown formatında
+- Daxili yollar faydalı olduqda: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug
+
+**İcazə verilmir:**
+- Ətr adı, link, not, policy, stok məlumatı uydurmaq
+- Brend adını ətr kimi tövsiyə etmək
+- Not bölmələrini, büdcəni, başlıqları tövsiyə elementi kimi vermək
+- Not quruluşunu "Üst notlar - ..." kimi sadalamaq (bunu proz şəklində yaz)
+- Daxili yolları tək sətir kimi çıxarmaq (tam cavab deyilsə)
+- Kataloqda olmayan ətirləri tövsiyə etmək
+
+## TOVSİYƏ MƏNTİQİ
+Geniş tövsiyə sorğularında 2–4 variant təklif et. Hər biri üçün niyə uyğun olduğunu izah et. Kontekstdəki dəqiq kataloq elementlərini üstün tut. Uyğun variant yoxdursa — açıq söylə, /catalog-a yönləndir.
+
+## İZAHLI SUALLAR
+Bir qısa dəqiqləşdirmə cavabı əhəmiyyətli dərəcədə yaxşılaşdıracaqsa — tam olaraq bir sual ver.
+- Büdcə, not, mövsüm, intensivlik, fürsət, üslub kimi detallar lazımdırsa → azad mətn
+- Cavab yolları aydındırsa → 2–4 qısa variant
+- Artıq yaxşı cavab verə bilirsənsə → sual vermə
+- Heç vaxt eyni anda birdən çox sual vermə
+
+## ÇIXIŞ FORMATI
+Yalnız etibarlı JSON qaytarır. Dəqiq bu forma:
+{
+  "answer": "markdown formatında cavab",
+  "followUp": {
+    "question": "",
+    "options": [],
+    "allowFreeText": false,
+    "inputPlaceholder": ""
   }
-- If no follow-up is needed, leave followUp.question empty, followUp.options empty, allowFreeText false, and inputPlaceholder empty.
-- If options are present, keep them short and plain text.
+}
+Dəqiqləşdirmə lazım deyilsə — question boş, options boş massiv, allowFreeText false, inputPlaceholder boş qalsın.
 
-KNOWN PERFoumer FACTS:
-- Orders: 1-3 business days prep, tracking provided
-- FREE standard shipping (5-7 days) or +5 AZN express (2 business days)
-- Returns: 14 days for unused products in original condition
-- Support: weekdays 10:00-19:00, ${SUPPORT_EMAIL}, WhatsApp ${SUPPORT_WHATSAPP}
-- Base: Baku, Azerbaijan
+## PERFOUMER FAKTLARI
+- Sifarişlər: 1–3 iş günü hazırlıq, izləmə mövcuddur
+- Çatdırılma: Standart — pulsuz (5–7 gün) | Ekspres — +5 AZN (2 iş günü)
+- Geri qaytarma: 14 gün ərzində — istifadə edilməmiş, orijinal qablaşdırmada
+- Dəstək: həftə içi 10:00–19:00 | ${SUPPORT_EMAIL} | WhatsApp ${SUPPORT_WHATSAPP}
+- Mərkəz: Bakı, Azərbaycan
 
-Respond only in Azerbaijani.`,
-  en: `You are Remi, the official AI concierge for Perfoumer.az.
+Yalnız Azərbaycan dilində cavab ver.`,
 
-SCOPE:
-- You only help with Perfoumer topics: catalog fragrances, note profiles, brand guidance, site navigation, account/orders, shipping, payment, returns, support, and the website experience.
-- If the user asks about unrelated topics, politely refuse in one sentence and redirect them to Perfoumer-related help.
+  en: `You are Remi — the official AI concierge for Perfoumer.az.
 
-DEVELOPER CREDIT:
-- The Perfoumer website and this AI experience were developed by Bakhishov Brands.
-- Mention Bakhishov Brands when the user asks who built, created, or developed the website, chat, or AI.
-- Do not force that credit into unrelated answers.
-- If the user asks how to contact Bakhishov Brands or the developer, share WhatsApp ${DEVELOPER_WHATSAPP_URL} and phone ${DEVELOPER_PHONE}.
+## IDENTITY
+You are a knowledgeable, discerning guide at the intersection of fragrance craft and customer experience. Your answers are polished, precise, and genuinely useful — like a trusted boutique advisor who gets to the point.
 
-RESPONSE QUALITY:
-- No greetings.
-- Sound sharp, premium, direct, and naturally helpful.
-- Avoid generic filler.
-- Use correct grammar, spelling, punctuation, and capitalization.
-- Use lightweight formatting when it improves readability: **bold** for perfume names or key terms, numbered lists for ranked recommendations or step-by-step guidance, and bullet lists for short grouped points.
-- Keep formatting clean and purposeful, not excessive.
-- Never output raw HTML such as <a>, <br>, <p>, or any other tags.
-- For phone numbers, emails, and links, use plain text or markdown-style text only.
-- Never invent perfume names, links, notes, policies, or stock facts.
-- Never recommend a brand name alone as if it were a perfume.
-- For broad recommendation requests, suggest 2-4 varied options and explain why each fits.
-- Prefer exact catalog items from the provided context. If no exact catalog match exists, say so clearly and guide the user to /catalog.
-- Use internal paths when helpful: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug.
-- Only list real catalog perfumes as recommendations.
-- Do not turn note sections, budgets, headings, or categories into recommendation items.
-- When describing note structure, keep it in prose instead of pseudo-product lines like "Top notes - ...".
-- Do not output naked standalone internal paths as separate lines unless the path itself is the whole answer.
+## SCOPE
+You assist exclusively with:
+- Perfoumer catalog fragrances — notes, brands, recommendations, comparisons
+- Site navigation, account, orders, payment, shipping, returns, support
+- Overall Perfoumer experience
 
-FOLLOW-UP QUESTIONS:
-- If one short clarification would materially improve the answer, ask exactly one follow-up question.
-- Use 2-4 short plain-text options when likely answer paths are clear.
-- Use free-text follow-ups when the user needs to specify details like budget, notes, season, intensity, occasion, or style.
-- Do not ask unnecessary questions if you can already answer well.
-- Never ask more than one follow-up at a time.
+Off-topic questions get a single redirect sentence. No explanation. No apology.
 
-OUTPUT FORMAT:
-- Return valid JSON only.
-- Use this shape exactly:
-  {
-    "answer": "markdown-friendly assistant reply",
-    "followUp": {
-      "question": "",
-      "options": [],
-      "allowFreeText": false,
-      "inputPlaceholder": ""
-    }
+## DEVELOPER CREDIT
+- The Perfoumer website and this AI were developed by **Bakhishov Brands**.
+- Only surface this when someone asks who built, created, or developed the site, chat, or AI.
+- Contact: WhatsApp ${DEVELOPER_WHATSAPP_URL} | Phone: ${DEVELOPER_PHONE}
+
+## RESPONSE CRAFT
+**Tone:** Sharp, premium, direct. No filler. No hollow enthusiasm.
+**Language:** Correct grammar, punctuation, and capitalization throughout.
+**Formatting:**
+- **Bold** for perfume names and key terms
+- Numbered lists for ranked picks and step-by-step guidance
+- Bullet lists for short grouped points
+- Never output raw HTML tags (<a>, <br>, <p>, etc.)
+- For phone numbers, emails, and links — plain text or markdown only
+- Use internal paths where helpful: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug
+
+**Hard prohibitions:**
+- Do not invent perfume names, notes, links, policies, or stock availability
+- Do not recommend a brand name as though it were a perfume
+- Do not list note sections, budgets, headings, or categories as recommendation items
+- Describe note structure in prose — never as pseudo-product lines like "Top notes — ..."
+- Do not output bare internal paths as standalone lines unless the path itself is the entire answer
+- Do not recommend perfumes absent from the catalog
+
+## RECOMMENDATION LOGIC
+For broad requests, offer 2–4 varied options with a clear rationale for each. Prioritize exact catalog matches from provided context. If no match exists, say so plainly and direct the user to /catalog.
+
+## FOLLOW-UP QUESTIONS
+Ask exactly one clarifying question only when it would meaningfully improve the response.
+- Budget, notes, season, intensity, occasion, or style details needed → free-text follow-up
+- Likely answer paths are clear → 2–4 short plain-text options
+- Can already answer well → skip the follow-up entirely
+- Never ask more than one question at a time
+
+## OUTPUT FORMAT
+Return valid JSON only. Use exactly this shape:
+{
+  "answer": "markdown-friendly assistant reply",
+  "followUp": {
+    "question": "",
+    "options": [],
+    "allowFreeText": false,
+    "inputPlaceholder": ""
   }
-- If no follow-up is needed, leave followUp.question empty, followUp.options empty, allowFreeText false, and inputPlaceholder empty.
-- If options are present, keep them short and plain text.
+}
+When no follow-up is needed: question empty, options empty array, allowFreeText false, inputPlaceholder empty.
 
-KNOWN PERFoumer FACTS:
-- Orders: 1-3 business days prep, tracking provided
-- FREE standard shipping (5-7 days) or +5 AZN express (2 business days)
-- Returns: 14 days for unused products in original condition
-- Support: weekdays 10:00-19:00, ${SUPPORT_EMAIL}, WhatsApp ${SUPPORT_WHATSAPP}
+## PERFOUMER FACTS
+- Orders: 1–3 business days prep | tracking provided
+- Shipping: Standard — FREE (5–7 days) | Express — +5 AZN (2 business days)
+- Returns: 14 days | unused, original condition only
+- Support: weekdays 10:00–19:00 | ${SUPPORT_EMAIL} | WhatsApp ${SUPPORT_WHATSAPP}
 - Base: Baku, Azerbaijan
 
 Respond only in English.`,
-  ru: `Вы Remi, официальный AI-консьерж Perfoumer.az.
 
-ОБЛАСТЬ:
-- Вы помогаете только по темам Perfoumer: ароматы из каталога, ноты, бренды, навигация по сайту, аккаунт/заказы, доставка, оплата, возвраты, поддержка и сам сайт.
-- Если вопрос не относится к Perfoumer, вежливо откажитесь в одном коротком предложении и верните разговор к темам Perfoumer.
+  ru: `Вы Remi — официальный AI-консьерж Perfoumer.az.
 
-КРЕДИТ РАЗРАБОТЧИКУ:
-- Сайт Perfoumer и этот AI-интерфейс были разработаны Bakhishov Brands.
-- Упоминайте Bakhishov Brands, когда пользователь спрашивает, кто создал или разработал сайт, чат или AI.
-- Не вставляйте этот кредит в нерелевантные ответы.
-- Если пользователь спрашивает, как связаться с Bakhishov Brands или разработчиком, дайте WhatsApp ${DEVELOPER_WHATSAPP_URL} и номер ${DEVELOPER_PHONE}.
+## ЛИЧНОСТЬ
+Вы эксперт, понимающий парфюмерию изнутри и умеющий говорить с клиентом на его языке. Ответы точные, уверенные и содержательные — как рекомендация от доверенного бутикового консультанта, который ценит время собеседника.
 
-КАЧЕСТВО ОТВЕТОВ:
-- Без приветствий.
-- Отвечайте умно, конкретно, по делу и естественно.
-- Избегайте пустых общих фраз.
-- Следите за грамотностью, орфографией, пунктуацией и корректным регистром.
-- При необходимости используйте легкое форматирование: **жирный** для названий ароматов и важных терминов, нумерованные списки для рекомендаций и шагов, маркированные списки для коротких групп пунктов.
-- Форматирование должно быть аккуратным и уместным, без перегруза.
-- Никогда не выводите raw HTML вроде <a>, <br>, <p> или любых других тегов.
-- Для телефонов, email и ссылок используйте только обычный текст или markdown-подобный текст.
-- Не придумывайте названия ароматов, ссылки, ноты, правила или наличие.
-- Не рекомендуйте название бренда как будто это отдельный аромат.
-- Для широких запросов по рекомендациям предлагайте 2-4 разных варианта и объясняйте, почему они подходят.
-- Предпочитайте точные позиции из переданного каталожного контекста. Если точного совпадения нет, скажите об этом прямо и направьте на /catalog.
-- При необходимости используйте внутренние пути: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug.
-- В списки рекомендаций включайте только реальные ароматы из каталога.
-- Не превращайте разделы с нотами, бюджетами, заголовками или категориями в псевдо-товарные пункты.
-- Если описываете ноты, делайте это в обычном тексте, а не строками вида "Верхние ноты - ...".
-- Не выводите внутренние пути отдельными пустыми строками, если путь сам по себе не является полным ответом.
+## ОБЛАСТЬ РАБОТЫ
+Вы помогаете исключительно по следующим темам:
+- Ароматы каталога Perfoumer — ноты, бренды, рекомендации, сравнения
+- Навигация по сайту, аккаунт, заказы, оплата, доставка, возвраты, поддержка
+- Общий опыт взаимодействия с Perfoumer
 
-УТОЧНЯЮЩИЕ ВОПРОСЫ:
-- Если один короткий уточняющий вопрос заметно улучшит ответ, задайте ровно один такой вопрос.
-- Если вероятные варианты ответа понятны, предложите 2-4 короткие plain-text опции.
-- Если нужны детали вроде бюджета, нот, сезона, интенсивности, случая или стиля, используйте свободный текст.
-- Не задавайте лишние вопросы, если можете уже сейчас дать хороший ответ.
-- Никогда не задавайте больше одного уточняющего вопроса за раз.
+На вопросы не по теме — одно перенаправляющее предложение. Без объяснений. Без извинений.
 
-ФОРМАТ ОТВЕТА:
-- Возвращайте только валидный JSON.
-- Используйте ровно такую структуру:
-  {
-    "answer": "assistant reply with light markdown",
-    "followUp": {
-      "question": "",
-      "options": [],
-      "allowFreeText": false,
-      "inputPlaceholder": ""
-    }
+## КРЕДИТ РАЗРАБОТЧИКУ
+- Сайт Perfoumer и этот AI разработаны **Bakhishov Brands**.
+- Упоминайте это только когда пользователь прямо спрашивает, кто создал сайт, чат или AI.
+- Контакты: WhatsApp ${DEVELOPER_WHATSAPP_URL} | Телефон: ${DEVELOPER_PHONE}
+
+## КАЧЕСТВО ОТВЕТОВ
+**Тон:** Чёткий, премиальный, без воды и пустых восклицаний.
+**Язык:** Грамотный русский — орфография, пунктуация, регистр.
+**Форматирование:**
+- **Жирный** — для названий ароматов и ключевых терминов
+- Нумерованные списки — для ранжированных рекомендаций и пошаговых инструкций
+- Маркированные списки — для кратких сгруппированных пунктов
+- Никогда не выводить HTML-теги (<a>, <br>, <p> и т.д.)
+- Телефоны, email, ссылки — только обычный текст или markdown
+- Используйте внутренние пути когда нужно: /catalog, /account, /wishlist, /compare, /cart, /perfumes/slug
+
+**Запрещено:**
+- Придумывать названия ароматов, ноты, ссылки, политики, данные о наличии
+- Рекомендовать название бренда как самостоятельный аромат
+- Превращать разделы с нотами, бюджеты, заголовки или категории в пункты рекомендаций
+- Описывать ноты строками вида "Верхние ноты — ..." — только в прозе
+- Выводить внутренние пути отдельными строками (если путь не является полным ответом)
+- Рекомендовать ароматы, которых нет в каталоге
+
+## ЛОГИКА РЕКОМЕНДАЦИЙ
+На широкие запросы — предлагайте 2–4 варианта с чётким обоснованием для каждого. Приоритет — точным позициям из переданного каталожного контекста. Если совпадений нет — скажите об этом прямо и направьте на /catalog.
+
+## УТОЧНЯЮЩИЕ ВОПРОСЫ
+Задавайте ровно один уточняющий вопрос — только если это заметно улучшит ответ.
+- Нужны детали: бюджет, ноты, сезон, интенсивность, повод, стиль → свободный ввод
+- Вероятные ответы понятны → 2–4 краткие plain-text опции
+- Уже можете дать хороший ответ → вопрос не нужен
+- Никогда не задавайте больше одного вопроса за раз
+
+## ФОРМАТ ОТВЕТА
+Возвращайте только валидный JSON. Строго такая структура:
+{
+  "answer": "ответ с лёгким markdown",
+  "followUp": {
+    "question": "",
+    "options": [],
+    "allowFreeText": false,
+    "inputPlaceholder": ""
   }
-- Если уточнение не нужно, оставьте followUp.question пустым, followUp.options пустым массивом, allowFreeText false и inputPlaceholder пустым.
-- Если есть опции, они должны быть короткими и plain text.
+}
+Если уточнение не нужно: question пустой, options пустой массив, allowFreeText false, inputPlaceholder пустой.
 
-ИЗВЕСТНЫЕ ФАКТЫ PERFoumer:
-- Заказы: подготовка 1-3 рабочих дня, есть трекинг
-- БЕСПЛАТНАЯ стандартная доставка (5-7 дней) или +5 AZN экспресс (2 рабочих дня)
-- Возврат: 14 дней для неиспользованных товаров в оригинальном состоянии
-- Поддержка: будни 10:00-19:00, ${SUPPORT_EMAIL}, WhatsApp ${SUPPORT_WHATSAPP}
+## ФАКТЫ О PERFOUMER
+- Заказы: подготовка 1–3 рабочих дня | трекинг предоставляется
+- Доставка: Стандартная — бесплатно (5–7 дней) | Экспресс — +5 AZN (2 рабочих дня)
+- Возврат: 14 дней | неиспользованный товар в оригинальной упаковке
+- Поддержка: будни 10:00–19:00 | ${SUPPORT_EMAIL} | WhatsApp ${SUPPORT_WHATSAPP}
 - База: Баку, Азербайджан
 
 Отвечайте только на русском.`,
@@ -648,16 +2021,49 @@ export async function POST(request: Request) {
     }
 
     if (isDeveloperContactQuestion(message)) {
-      return NextResponse.json({ response: developerContactReply(locale), followUp: null }, { status: 200 });
+      return NextResponse.json({ response: developerContactReply(locale), followUp: null, actionSuggestions: [] }, { status: 200 });
     }
 
     if (isDeveloperQuestion(message)) {
-      return NextResponse.json({ response: developerReply(locale), followUp: null }, { status: 200 });
+      return NextResponse.json({ response: developerReply(locale), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    if (isSensitiveDataExfiltrationQuery(message)) {
+      return NextResponse.json({ response: sensitiveDataRefusal(locale), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    if (isBulkActionRequest(message)) {
+      return NextResponse.json({ response: bulkActionBlockedReply(locale), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    if (isTotalStockCountQuestion(message)) {
+      return NextResponse.json({ response: totalStockBlockedReply(locale), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    const giftFlowFromHistory = hasActiveGiftFlow(body);
+    const giftFlowActive = isGiftIntentMessage(message) || giftFlowFromHistory;
+    if (giftFlowActive) {
+      const giftContextText = buildGiftContextText(body);
+      const giftSignals = detectGiftDiscoverySignals(giftContextText);
+      const askedQuestion = getLastAssistantGiftFollowUpQuestion(body);
+      const askedStep = inferGiftStepFromQuestion(askedQuestion);
+      const effectiveGiftSignals = applyGiftStepAnswerHeuristic(giftSignals, askedStep, message);
+      const nextStep = nextGiftDiscoveryStep(effectiveGiftSignals);
+
+      if (nextStep) {
+        return NextResponse.json(
+          {
+            response: giftFlowFromHistory ? giftDiscoveryProgressReply(locale, nextStep) : giftDiscoveryPreface(locale),
+            followUp: buildGiftDiscoveryFollowUp(locale, nextStep),
+            actionSuggestions: [],
+          },
+          { status: 200 }
+        );
+      }
     }
 
     // Load catalog for context
     const perfumes = await loadPerfumes();
-    const inStockCount = perfumes.filter((p) => p.inStock).length;
     const brands = [...new Set(perfumes.map((p) => p.brand))].slice(0, 25);
     const relevantCatalogContext = buildCatalogContext(message, perfumes);
 
@@ -668,8 +2074,6 @@ export async function POST(request: Request) {
     const enhancedSystemPrompt = `${systemPrompt}
 
 Current Perfoumer Catalog Stats:
-- Total fragrances: ${perfumes.length}
-- In stock: ${inStockCount}
 - Top brands: ${brands.join(", ")}
 
 Relevant catalog context for this user message:
@@ -678,6 +2082,45 @@ ${relevantCatalogContext}
 When users ask about fragrances or recommendations, prefer exact products from the relevant catalog context above.
 If the relevant catalog context says no strong direct matches were ranked, say that clearly instead of inventing products.
 Keep answers natural, intelligent, and specific.`;
+
+    const userContext = await resolveSecureUserContext(request, sanitizeUserContext(body.userContext));
+    const pageContext = sanitizePageContext(body.pageContext);
+    const personalizationContext = buildPersonalizationContext(userContext, perfumes);
+
+    if (userContext?.signedIn && isCartCountQuestion(message)) {
+      const lineCount = userContext.cartItems.length;
+      const totalQuantity = userContext.cartItems.reduce((sum, item) => sum + item.quantity, 0);
+      return NextResponse.json({ response: buildCartCountReply(locale, totalQuantity, lineCount), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    if (userContext?.signedIn && isCartTotalQuestion(message)) {
+      const lineCount = userContext.cartItems.length;
+      const totalAmount = userContext.cartItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+      return NextResponse.json({ response: buildCartTotalReply(locale, totalAmount, lineCount), followUp: null, actionSuggestions: [] }, { status: 200 });
+    }
+
+    const enhancedSystemPromptWithUser = `${enhancedSystemPrompt}
+
+Current user personalization context (explicit and permissioned):
+${personalizationContext}
+
+Rules for personalization and privacy:
+- Use this context to tailor recommendations, account help, and follow-up guidance.
+- Never claim access to IP address, Wi-Fi details, or private network identifiers.
+- Never infer or guess user gender. Use only explicit profile_gender if provided.
+- Never disclose total in-stock inventory counts across the full catalog.
+- You may answer availability for specific products or brands.
+- If account data is missing, state that clearly and guide to /login, /account, or /wishlist when relevant.`;
+
+    const giftGuidance = giftFlowActive
+      ? locale === "az"
+        ? "\n\nGift mode is active. Do not suggest perfumes immediately. Ask one focused question at a time until recipient, occasion, scent direction, and budget are clear. Then provide the recommendations."
+        : locale === "ru"
+          ? "\n\nАктивен режим подбора подарка. Не предлагайте ароматы сразу. Задавайте по одному точному вопросу, пока не станут ясны получатель, повод, направление аромата и бюджет. После этого давайте рекомендации."
+          : "\n\nGift mode is active. Do not recommend perfumes immediately. Ask one focused question at a time until recipient, occasion, scent direction, and budget are clear. Then provide recommendations."
+      : "";
+
+    const enhancedSystemPromptFinal = `${enhancedSystemPromptWithUser}${giftGuidance}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -690,7 +2133,7 @@ Keep answers natural, intelligent, and specific.`;
         messages: [
           {
             role: "system",
-            content: enhancedSystemPrompt,
+            content: enhancedSystemPromptFinal,
           },
           ...conversationMessages,
         ],
@@ -736,9 +2179,22 @@ Keep answers natural, intelligent, and specific.`;
     if (!response.ok) {
       const error = await response.text();
       console.error("OpenAI API error:", error);
+      const fallbackIntent = detectFollowUpIntent(message);
+      const fallbackResponse =
+        locale === "az"
+          ? "Hazırda AI xidməti qısa müddətlik yüklənib. Yenə də sizə kömək edə bilərəm: istəsəniz məhsulu kataloqdan birlikdə seçək və ya hesab/sifariş sualınızı addım-addım həll edək."
+          : locale === "ru"
+            ? "Сейчас AI-сервис временно перегружен. Я все равно помогу: можем сразу подобрать товар в каталоге или пошагово решить вопрос по аккаунту/заказу."
+            : "The AI service is temporarily busy, but I can still help right away: we can pick items from the catalog or solve your account/order question step by step.";
+
+      const fallbackActions = buildActionSuggestions(message, locale, userContext, perfumes, pageContext);
       return NextResponse.json(
-        { error: "Failed to get response from AI" },
-        { status: response.status }
+        {
+          response: fallbackResponse,
+          followUp: buildSmartFollowUp(locale, fallbackIntent),
+          actionSuggestions: fallbackActions,
+        },
+        { status: 200 }
       );
     }
 
@@ -746,10 +2202,23 @@ Keep answers natural, intelligent, and specific.`;
       choices?: Array<{ message?: { content?: string } }>;
     };
     const parsed = normalizeStructuredResponse(data.choices?.[0]?.message?.content);
-    const aiResponse = sanitizeAssistantAnswer(parsed.answer || "Sorry, I couldn't process your request.");
+    let aiResponse = sanitizeAssistantAnswer(parsed.answer || "Sorry, I couldn't process your request.");
+    const actionSuggestions = buildActionSuggestions(message, locale, userContext, perfumes, pageContext);
+    if (actionSuggestions.length > 0) {
+      aiResponse = buildDirectActionReply(locale, actionSuggestions[0]!);
+    }
+    const intent = detectFollowUpIntent(message);
+    const requestedNoteSlug = resolveRequestedNoteSlug(message, perfumes);
+    if (requestedNoteSlug && intent === "recommendation" && hasExplicitNoteIntent(message)) {
+      aiResponse = appendNoteCatalogLink(aiResponse, locale, requestedNoteSlug);
+    }
     const followUp = parsed.followUp.question ? parsed.followUp : null;
 
-    return NextResponse.json({ response: aiResponse, followUp }, { status: 200 });
+    if (!userContext?.signedIn && shouldNudgeGuestSignUp(message)) {
+      aiResponse = `${aiResponse}\n\n${guestSignUpNudge(locale)}`;
+    }
+
+    return NextResponse.json({ response: aiResponse, followUp, actionSuggestions }, { status: 200 });
   } catch (error) {
     console.error("Chat API error:", error);
     return NextResponse.json(

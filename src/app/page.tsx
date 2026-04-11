@@ -2,11 +2,13 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Footer } from "@/components/Footer";
 import { Hero } from "@/components/Hero";
-import { ProductCard } from "@/components/ProductCard";
-import { getFeaturedPerfumes } from "@/lib/catalog";
+import { HomeFeaturedSearch } from "@/components/home/HomeFeaturedSearch";
+import { PersonalizedFeaturedGrid } from "@/components/home/PersonalizedFeaturedGrid";
+import { getFeaturedPerfumes, getPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildAzeriPageKeywords } from "@/lib/seo";
+import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
 
 export const metadata: Metadata = {
   title: "Orijinal və Premium Ətirlər Onlayn",
@@ -276,7 +278,14 @@ const ABOUT_COPY: Record<Locale, AboutCopy> = {
 export default async function Home() {
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
+  const supabaseConfig = getSupabasePublicConfigFromServer();
   const featured = await getFeaturedPerfumes();
+  const perfumes = await getPerfumes();
+  const heroProducts = perfumes.map((perfume) => ({
+    slug: perfume.slug,
+    name: perfume.name,
+    brand: perfume.brand,
+  }));
   const stats = [
     { value: "98%", ...t.home.stats[0] },
     { value: "900+", ...t.home.stats[1] },
@@ -300,13 +309,15 @@ export default async function Home() {
           <p className="mx-auto mt-4 max-w-xl text-zinc-500">
             {t.home.selectedDescription}
           </p>
+          <HomeFeaturedSearch locale={locale} products={heroProducts} />
         </section>
 
-        <section className="mt-10 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4 xl:gap-5">
-          {featured.map((perfume) => (
-            <ProductCard key={perfume.id} perfume={perfume} locale={locale} />
-          ))}
-        </section>
+        <PersonalizedFeaturedGrid
+          featured={featured}
+          allPerfumes={perfumes}
+          locale={locale}
+          supabase={supabaseConfig}
+        />
 
         <div className="mt-8 flex justify-center">
           <Link
