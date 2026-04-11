@@ -1,0 +1,157 @@
+.cart-pill-btn:active:not(:disabled) {
+  background: #ececec;
+  color: #232323;
+  transform: scale(0.96);
+  animation: cartPillMagneticClick 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cartPillMagneticClick {
+  0% {
+    box-shadow: 0 0 0 0 rgba(40, 40, 40, 0.13), 0 0 0 0 rgba(0,0,0,0.04);
+    filter: brightness(1) drop-shadow(0 0 0 #bdbdbd);
+  }
+  40% {
+    box-shadow: 0 0 0 8px rgba(180, 180, 180, 0.10), 0 0 0 0 rgba(0,0,0,0.04);
+    filter: brightness(1.08) drop-shadow(0 2px 8px #bdbdbd33);
+  }
+  100% {
+    box-shadow: 0 4px 18px rgba(40, 40, 40, 0.10), 0 1.5px 4px rgba(0,0,0,0.04);
+    filter: brightness(1) drop-shadow(0 0 0 #bdbdbd);
+  }
+}
+/* Unified pill group for cart quantity */
+.cart-pill-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #f8f8f7 0%, #ececec 100%);
+  box-shadow: 0 4px 18px rgba(40, 40, 40, 0.10), 0 1.5px 4px rgba(0,0,0,0.04);
+  border: 1.5px solid #e5e5e4;
+  overflow: hidden;
+  min-width: 7.2rem;
+  min-height: 2.7rem;
+  transition:
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.cart-pill-group[data-active="left"] {
+  transform: perspective(44px) rotateY(-13deg) scale(0.98);
+  box-shadow: 0 2px 18px rgba(40, 40, 40, 0.13), 0 1.5px 4px rgba(0,0,0,0.04);
+}
+.cart-pill-group[data-active="right"] {
+  transform: perspective(44px) rotateY(13deg) scale(0.98);
+  box-shadow: 0 2px 18px rgba(40, 40, 40, 0.13), 0 1.5px 4px rgba(0,0,0,0.04);
+}
+}
+
+.cart-pill-btn {
+  background: none;
+  border: none;
+  outline: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.7rem;
+  height: 2.7rem;
+  cursor: pointer;
+  transition:
+    background 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    color 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  position: relative;
+  z-index: 1;
+}
+.cart-pill-btn--left {
+  border-top-left-radius: 999px;
+  border-bottom-left-radius: 999px;
+}
+.cart-pill-btn--right {
+  border-top-right-radius: 999px;
+  border-bottom-right-radius: 999px;
+}
+.cart-pill-btn:hover:not(:disabled) {
+  background: linear-gradient(120deg, #f3f3f2 0%, #e0e0de 100%);
+  color: #111;
+  box-shadow: 0 6px 18px rgba(40, 40, 40, 0.13);
+  transform: scale(1.08);
+}
+.cart-pill-btn:active:not(:disabled) {
+  background: #ececec;
+  color: #232323;
+  transform: scale(0.96);
+}
+.cart-pill-btn:disabled {
+  opacity: 0.55;
+  pointer-events: none;
+  filter: grayscale(0.18);
+}
+.cart-pill-qty {
+  min-width: 2.8rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.13rem;
+  font-weight: 600;
+  color: #232323;
+  user-select: none;
+  background: none;
+}
+.cart-pill-qty__value {
+  width: 100%;
+  text-align: center;
+  font-size: 1.13rem;
+  font-weight: 600;
+  color: #232323;
+  letter-spacing: 0.01em;
+  user-select: none;
+}
+.cart-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(120deg, #f8f8f7 0%, #ececec 100%);
+  box-shadow: 0 4px 18px rgba(40, 40, 40, 0.10), 0 1.5px 4px rgba(0,0,0,0.04);
+  border: 1.5px solid #e5e5e4;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  transition: 
+    box-shadow 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    background 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  overflow: hidden;
+  user-select: none;
+}
+.cart-pill:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 8px rgba(40, 40, 40, 0.13);
+}
+.cart-pill--magnetic:hover {
+  background: linear-gradient(120deg, #f3f3f2 0%, #e0e0de 100%);
+  box-shadow: 0 8px 28px rgba(40, 40, 40, 0.16), 0 2px 8px rgba(0,0,0,0.06);
+  border-color: #d1d1cf;
+  transform: translateY(-2px) scale(1.04);
+}
+.cart-pill__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: #232323;
+  transition: color 180ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.cart-pill:disabled,
+.cart-pill[aria-disabled="true"] {
+  opacity: 0.55;
+  pointer-events: none;
+  filter: grayscale(0.18);
+}

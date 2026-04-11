@@ -316,6 +316,10 @@ h6 {
   animation: scentSummaryPanelIn 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.pac-container {
+  z-index: 9999 !important;
+}
+
 .summary-reveal {
   animation: scentSummaryReveal 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }

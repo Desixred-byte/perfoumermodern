@@ -49,7 +49,7 @@ const normalizeNoteLookupKey = (value: string) =>
     .replace(/^-+/, "")
     .replace(/-+$/, "");
 
-const parsePrice = (value: string): number | null => {
+export const parsePrice = (value: string): number | null => {
   if (!value?.trim()) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

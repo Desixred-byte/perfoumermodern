@@ -1,0 +1,430 @@
+"use client";
+
+import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import type { Session } from "@supabase/supabase-js";
+import { useEffect, useMemo, useRef, useState } from "react";
+
+import { getDictionary, type Locale } from "@/lib/i18n";
+import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
+import type { SupabasePublicConfig } from "@/lib/supabase/client";
+import type { PerfumeSize } from "@/types/catalog";
+
+type PerfumePurchasePanelProps = {
+  locale: Locale;
+  perfumeSlug: string;
+  perfumeName: string;
+  sizes: PerfumeSize[];
+  supabase: SupabasePublicConfig | null;
+};
+
+type Copy = {
+  selectedSize: string;
+  bestValue: string;
+  perMl: string;
+  addToCart: string;
+  adding: string;
+  added: string;
+  addFailed: string;
+  cart: string;
+  signInToSave: string;
+  configMissing: string;
+};
+
+const copyByLocale: Record<Locale, Copy> = {
+  az: {
+    selectedSize: "Seçilən ölçü",
+    bestValue: "Sərfəli",
+    perMl: "1ml qiymət",
+    addToCart: "Səbətə əlavə et",
+    adding: "Əlavə olunur...",
+    added: "Məhsul seçilən ölçü ilə səbətə əlavə olundu.",
+    addFailed: "Səbətə əlavə etmək alınmadı. Yenidən cəhd et.",
+    cart: "Səbətə keç",
+    signInToSave: "Səbət üçün giriş et",
+    configMissing: "Səbəti saxlamaq üçün Supabase konfiqurasiyası tələb olunur.",
+  },
+  en: {
+    selectedSize: "Selected size",
+    bestValue: "Best value",
+    perMl: "Price per 1ml",
+    addToCart: "Add to cart",
+    adding: "Adding...",
+    added: "Added to cart with selected size.",
+    addFailed: "Could not add to cart. Please try again.",
+    cart: "Go to cart",
+    signInToSave: "Sign in to save cart",
+    configMissing: "Supabase configuration is required for cart storage.",
+  },
+  ru: {
+    selectedSize: "Выбранный объем",
+    bestValue: "Выгодно",
+    perMl: "Цена за 1мл",
+    addToCart: "Добавить в корзину",
+    adding: "Добавляем...",
+    added: "Товар добавлен в корзину с выбранным объемом.",
+    addFailed: "Не удалось добавить в корзину. Попробуйте снова.",
+    cart: "Перейти в корзину",
+    signInToSave: "Войдите для сохранения корзины",
+    configMissing: "Для сохранения корзины нужна настройка Supabase.",
+  },
+};
+
+export function PerfumePurchasePanel({
+  locale,
+  perfumeSlug,
+  perfumeName,
+  sizes,
+  supabase: supabaseConfig,
+}: PerfumePurchasePanelProps) {
+  const t = getDictionary(locale);
+  const copy = copyByLocale[locale];
+  const pathname = usePathname();
+  const router = useRouter();
+  const supabase = getSupabaseBrowserClient(supabaseConfig ?? undefined);
+
+  const [selectedMl, setSelectedMl] = useState<number | null>(() => sizes[0]?.ml ?? null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [message, setMessage] = useState<{ text: string; tone: "success" | "error" } | null>(null);
+  const addLockRef = useRef(false);
+  const emitCartUpdated = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    window.dispatchEvent(new Event("perfoumer:cart-updated"));
+  };
+
+  useEffect(() => {
+    if (!supabase) {
+      return;
+    }
+
+    let isMounted = true;
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!isMounted) {
+        return;
+      }
+      setSession(data.session ?? null);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      if (!isMounted) {
+        return;
+      }
+
+      setSession(nextSession);
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
+
+  const normalizedSelectedMl =
+    selectedMl && sizes.some((item) => item.ml === selectedMl) ? selectedMl : sizes[0]?.ml ?? null;
+
+  const selectedSize = useMemo(
+    () => sizes.find((size) => size.ml === normalizedSelectedMl) ?? null,
+    [normalizedSelectedMl, sizes],
+  );
+  const maxMl = useMemo(
+    () => Math.max(...sizes.map((size) => size.ml), 1),
+    [sizes],
+  );
+  const bestValueMl = useMemo(() => {
+    if (!sizes.length) {
+      return null;
+    }
+
+    return sizes.reduce((best, candidate) =>
+      candidate.price / candidate.ml < best.price / best.ml ? candidate : best,
+    ).ml;
+  }, [sizes]);
+
+  useEffect(() => {
+    if (!message) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      setMessage(null);
+    }, 2500);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [message]);
+
+  const addToCart = async (redirectToCart = false) => {
+    if (!selectedSize) {
+      return;
+    }
+
+    if (!isSupabaseConfigured(supabaseConfig ?? undefined) || !supabase) {
+      setMessage({ text: copy.configMissing, tone: "error" });
+      return;
+    }
+
+    if (isSubmitting || addLockRef.current) {
+      return;
+    }
+
+    if (!session?.user) {
+      const nextPath = pathname || `/perfumes/${perfumeSlug}`;
+      router.push(`/login?next=${encodeURIComponent(nextPath)}`);
+      return;
+    }
+
+    addLockRef.current = true;
+    setIsSubmitting(true);
+    setMessage(null);
+
+    try {
+      const { data: existingRows, error: selectError } = await supabase
+        .from("cart_items")
+        .select("id,quantity,created_at")
+        .eq("user_id", session.user.id)
+        .eq("perfume_slug", perfumeSlug)
+        .eq("size_ml", selectedSize.ml)
+        .order("created_at", { ascending: true });
+
+      if (selectError) {
+        setMessage({ text: selectError.message || copy.addFailed, tone: "error" });
+        return;
+      }
+
+      const rows = ((existingRows as { id?: string; quantity?: number }[] | null) ?? []).filter(
+        (row) => Boolean(row.id),
+      );
+      const primaryRow = rows[0] ?? null;
+      const existingQuantity = rows.reduce(
+        (sum, row) => sum + (Number.isFinite(row.quantity) ? Number(row.quantity) : 0),
+        0,
+      );
+      const nextQuantity = Math.max(1, existingQuantity + 1);
+
+      const result = primaryRow?.id
+        ? await supabase
+            .from("cart_items")
+            .update({
+              quantity: nextQuantity,
+              unit_price: selectedSize.price,
+            })
+            .eq("id", primaryRow.id)
+            .eq("user_id", session.user.id)
+        : await supabase.from("cart_items").insert({
+            user_id: session.user.id,
+            perfume_slug: perfumeSlug,
+            size_ml: selectedSize.ml,
+            quantity: 1,
+            unit_price: selectedSize.price,
+          });
+
+      if (result.error) {
+        setMessage({ text: result.error.message || copy.addFailed, tone: "error" });
+        return;
+      }
+
+      if (rows.length > 1 && primaryRow?.id) {
+        const duplicateIds = rows
+          .slice(1)
+          .map((row) => row.id)
+          .filter((id): id is string => Boolean(id));
+
+        if (duplicateIds.length > 0) {
+          await supabase
+            .from("cart_items")
+            .delete()
+            .in("id", duplicateIds)
+            .eq("user_id", session.user.id);
+        }
+      }
+
+      setMessage({ text: copy.added, tone: "success" });
+      emitCartUpdated();
+
+      if (redirectToCart) {
+        router.push("/cart");
+      }
+    } finally {
+      setIsSubmitting(false);
+      addLockRef.current = false;
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="relative overflow-hidden rounded-[2.05rem] border border-zinc-200/80 bg-[linear-gradient(155deg,#ffffff_0%,#fafafa_52%,#f2f2f2_100%)] shadow-[0_24px_58px_rgba(24,24,24,0.08)] ring-1 ring-zinc-200/70">
+        <div className="pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,#e5e5e5_0%,rgba(229,229,229,0)_70%)]" />
+        <div className="pointer-events-none absolute -bottom-12 -left-14 h-36 w-36 rounded-full bg-[radial-gradient(circle,#f1f1f1_0%,rgba(241,241,241,0)_70%)]" />
+
+        <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 px-4 py-4 md:px-6">
+          <p className="text-[0.72rem] font-medium tracking-[0.22em] text-zinc-500 uppercase">
+            {t.detail.sizePrice}
+          </p>
+          {selectedSize ? (
+            <p className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-[0.78rem] font-medium tracking-[0.04em] text-zinc-700">
+              {copy.selectedSize}: {selectedSize.ml}ml
+            </p>
+          ) : (
+            <p className="hidden text-sm text-zinc-500 md:block">{t.detail.choose}</p>
+          )}
+        </div>
+
+        {sizes.length ? (
+          <div className="grid grid-cols-3 gap-1.5 p-2 md:gap-2.5 md:p-3">
+            {sizes.map((size) => {
+              const isSelected = selectedSize?.ml === size.ml;
+              const isBestValue = bestValueMl === size.ml;
+              const fillLevel = Math.max(16, Math.round((size.ml / maxMl) * 100));
+              const perMlPrice = (Math.round((size.price / size.ml) * 100) / 100).toFixed(2);
+              const imageFrameClass =
+                size.ml >= 50
+                  ? "h-[66px] w-[48px] md:h-[108px] md:w-[82px]"
+                  : size.ml >= 30
+                    ? "h-[62px] w-[45px] md:h-[100px] md:w-[74px]"
+                    : "h-[58px] w-[42px] md:h-[92px] md:w-[66px]";
+              const sizeImage =
+                size.ml === 15
+                  ? "/15mlperfoumer.png"
+                  : size.ml === 30 || size.ml === 50
+                    ? "/30mlperfoumer.png"
+                    : "/perfoumerjar.png";
+
+              return (
+                <button
+                  key={size.ml}
+                  type="button"
+                  onClick={() => setSelectedMl(size.ml)}
+                  className={[
+                    "group relative overflow-hidden rounded-[1rem] border p-2 text-left transition-all duration-300 md:rounded-[1.35rem] md:p-3.5",
+                    isSelected
+                      ? "border-zinc-700 bg-[linear-gradient(160deg,#111111_0%,#262626_100%)] text-zinc-100 shadow-[0_16px_34px_rgba(24,24,24,0.34)]"
+                      : "border-zinc-200 bg-[linear-gradient(160deg,#ffffff_0%,#f7f7f7_100%)] text-zinc-900 shadow-[0_8px_18px_rgba(24,24,24,0.06)] hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_14px_28px_rgba(24,24,24,0.1)]",
+                  ].join(" ")}
+                  aria-pressed={isSelected}
+                >
+                  <div className="relative flex items-start justify-between gap-1 md:gap-2">
+                    <div className="flex items-start justify-between gap-1 md:gap-2">
+                      <div>
+                        <p
+                          className={[
+                            "text-[0.96rem] leading-none tracking-[-0.03em] font-[family-name:var(--font-playfair)] md:text-[1.22rem]",
+                            isSelected ? "text-zinc-100" : "text-zinc-900",
+                          ].join(" ")}
+                        >
+                          <span className="font-semibold">{size.ml}</span>
+                          <span className={isSelected ? "ml-1 text-zinc-300" : "ml-1 text-zinc-500"}>ml</span>
+                        </p>
+                      </div>
+
+                      {isBestValue ? (
+                        <span
+                          className={[
+                            "hidden rounded-full px-2 py-1 text-[0.58rem] font-medium tracking-[0.14em] uppercase md:inline-flex",
+                            isSelected ? "bg-white/12 text-zinc-200" : "bg-zinc-100 text-zinc-700",
+                          ].join(" ")}
+                        >
+                          {copy.bestValue}
+                        </span>
+                      ) : null}
+                    </div>
+
+                    <div className={["relative shrink-0", imageFrameClass].join(" ")}>
+                      <span
+                        aria-hidden="true"
+                        className={[
+                          "absolute left-1/2 bottom-0 h-2 w-[78%] -translate-x-1/2 rounded-full blur-[1px]",
+                          isSelected ? "bg-black/55" : "bg-zinc-500/30",
+                        ].join(" ")}
+                      />
+                      <Image
+                        src={sizeImage}
+                        alt="Perfoumer"
+                        fill
+                        sizes="(max-width: 767px) 52px, 96px"
+                        className={[
+                          "object-contain object-bottom drop-shadow-[0_10px_12px_rgba(19,14,10,0.22)] transition-all duration-300 md:drop-shadow-[0_16px_20px_rgba(19,14,10,0.26)]",
+                          isSelected ? "scale-[1.04] opacity-100" : "opacity-92 group-hover:scale-[1.06]",
+                        ].join(" ")}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="relative mt-1.5 md:mt-2.5">
+                    <p className="text-[1.18rem] leading-none tracking-[-0.05em] font-[family-name:var(--font-playfair)] md:text-[1.74rem]">
+                      {size.price}
+                      <span className={isSelected ? "ml-1 text-[0.62em] text-zinc-300" : "ml-1 text-[0.62em] text-zinc-600"}>
+                        ₼
+                      </span>
+                    </p>
+                    <p className={["mt-1 hidden text-[0.68rem] md:block", isSelected ? "text-zinc-400" : "text-zinc-500"].join(" ")}>
+                      {copy.perMl}: {perMlPrice} ₼
+                    </p>
+
+                    <div
+                      className={[
+                        "mt-2 h-1 overflow-hidden rounded-full md:mt-3 md:h-2",
+                        isSelected ? "bg-white/18" : "bg-zinc-200/70",
+                      ].join(" ")}
+                    >
+                      <span
+                        className={[
+                          "block h-full rounded-full transition-all duration-500",
+                          isSelected ? "bg-zinc-100" : "bg-zinc-700",
+                        ].join(" ")}
+                        style={{ width: `${fillLevel}%` }}
+                      />
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="px-5 py-5 text-zinc-500">{t.detail.noPrice}</div>
+        )}
+      </div>
+
+      {selectedSize ? (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => {
+                void addToCart(false);
+              }}
+              disabled={isSubmitting}
+              className="inline-flex min-h-13 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-lg font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? copy.adding : copy.addToCart}
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                void addToCart(true);
+              }}
+              disabled={isSubmitting}
+              className="detail-cta detail-cta-primary inline-flex min-h-13 w-full items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSubmitting ? copy.adding : t.detail.order}
+            </button>
+          </div>
+        </>
+      ) : null}
+
+      {message ? (
+        <p className={message.tone === "success" ? "text-sm text-emerald-700" : "text-sm text-red-600"}>
+          {message.text}
+        </p>
+      ) : null}
+    </div>
+  );
+}

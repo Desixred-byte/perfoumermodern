@@ -3,8 +3,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowRight } from "@phosphor-icons/react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import { ArrowRight, ShoppingBag } from "@phosphor-icons/react";
 import type { Session } from "@supabase/supabase-js";
 import { getDictionary, locales, type Locale } from "@/lib/i18n";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
@@ -19,6 +19,8 @@ export function Header({ floating = false, locale }: HeaderProps) {
   const [pendingLocale, setPendingLocale] = useState<Locale | null>(null);
   const [isLocalePending, startLocaleTransition] = useTransition();
   const [session, setSession] = useState<Session | null>(null);
+  const [cartItemCount, setCartItemCount] = useState(0);
+  const cartCountRequestRef = useRef(0);
   const router = useRouter();
   const pathname = usePathname();
   const t = getDictionary(locale);
@@ -47,6 +49,7 @@ export function Header({ floating = false, locale }: HeaderProps) {
     { href: "/qoxunu", label: t.header.scentQuiz },
   ];
   const secondaryMenuItems = [
+    { href: "/cart", label: t.header.cart },
     ...(session ? [{ href: "/wishlist", label: copy[locale].wishlist }] : []),
     { href: "/brands", label: t.header.brands },
     { href: "/#about", label: t.header.about },
@@ -56,6 +59,37 @@ export function Header({ floating = false, locale }: HeaderProps) {
     const nextPath = pathname || "/";
     return `/login?next=${encodeURIComponent(nextPath)}`;
   }, [pathname]);
+
+  const loadCartItemCount = useCallback(
+    async (userId: string) => {
+      const requestId = ++cartCountRequestRef.current;
+      if (!supabase || !isSupabaseConfigured()) {
+        if (requestId === cartCountRequestRef.current) {
+          setCartItemCount(0);
+        }
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("cart_items")
+        .select("quantity")
+        .eq("user_id", userId);
+
+      if (error) {
+        if (requestId === cartCountRequestRef.current) {
+          setCartItemCount(0);
+        }
+        return;
+      }
+
+      const rows = (data as { quantity: number }[] | null) ?? [];
+      const totalItems = rows.reduce((sum, row) => sum + (Number.isFinite(row.quantity) ? row.quantity : 0), 0);
+      if (requestId === cartCountRequestRef.current) {
+        setCartItemCount(totalItems);
+      }
+    },
+    [supabase],
+  );
 
   useEffect(() => {
     if (isMenuOpen) {
@@ -78,7 +112,13 @@ export function Header({ floating = false, locale }: HeaderProps) {
     let isMounted = true;
     supabase.auth.getSession().then(({ data }) => {
       if (!isMounted) return;
-      setSession(data.session ?? null);
+      const currentSession = data.session ?? null;
+      setSession(currentSession);
+      if (currentSession?.user?.id) {
+        void loadCartItemCount(currentSession.user.id);
+      } else {
+        setCartItemCount(0);
+      }
     });
 
     const {
@@ -86,13 +126,35 @@ export function Header({ floating = false, locale }: HeaderProps) {
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       if (!isMounted) return;
       setSession(nextSession);
+      if (nextSession?.user?.id) {
+        void loadCartItemCount(nextSession.user.id);
+      } else {
+        setCartItemCount(0);
+      }
     });
 
     return () => {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, loadCartItemCount]);
+
+  useEffect(() => {
+    const userId = session?.user?.id;
+    if (!userId || typeof window === "undefined") {
+      return;
+    }
+
+    const onCartUpdated = () => {
+      void loadCartItemCount(userId);
+    };
+
+    window.addEventListener("perfoumer:cart-updated", onCartUpdated);
+
+    return () => {
+      window.removeEventListener("perfoumer:cart-updated", onCartUpdated);
+    };
+  }, [session?.user?.id, loadCartItemCount]);
 
   const menuTransition =
     "transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)]";
@@ -175,6 +237,31 @@ export function Header({ floating = false, locale }: HeaderProps) {
                 </button>
               ))}
             </div>
+
+            <Link
+              href="/cart"
+              aria-label={t.header.cart}
+              className="group relative grid h-9 w-9 place-items-center rounded-full bg-[linear-gradient(155deg,#ffffff_0%,#f4f4f2_100%)] text-zinc-700 opacity-100 shadow-[0_10px_20px_rgba(24,24,24,0.12)] ring-1 ring-zinc-200/85 transition-[transform,box-shadow,background-color] duration-300 hover:-translate-y-0.5 hover:scale-[1.03] hover:shadow-[0_16px_28px_rgba(24,24,24,0.17)] active:translate-y-0 active:scale-[0.94] sm:h-11 sm:w-11"
+            >
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-full bg-[radial-gradient(circle_at_28%_20%,rgba(255,255,255,0.95)_0%,rgba(255,255,255,0)_58%)] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+              />
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-full ring-1 ring-zinc-200/0 transition-all duration-300 group-hover:scale-[1.06] group-hover:ring-zinc-300/80 group-active:scale-100"
+              />
+              <ShoppingBag
+                size={18}
+                weight="regular"
+                className="relative z-[1] transition-transform duration-300 group-hover:-translate-y-0.5 group-hover:scale-110 group-active:translate-y-0 group-active:scale-95 sm:size-[19px]"
+              />
+              {cartItemCount > 0 ? (
+                <span className="absolute -right-1 -top-1 z-[2] inline-flex min-w-[1.1rem] items-center justify-center rounded-full bg-zinc-900 px-1 py-0.5 text-[10px] font-semibold leading-none text-white shadow-[0_6px_14px_rgba(24,24,24,0.28)] ring-1 ring-white transition-transform duration-300 group-hover:scale-110 group-active:scale-95 sm:min-w-[1.2rem]">
+                  {cartItemCount > 99 ? "99+" : cartItemCount}
+                </span>
+              ) : null}
+            </Link>
 
             <button
               type="button"
