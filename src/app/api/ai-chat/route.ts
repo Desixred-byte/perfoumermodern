@@ -1374,6 +1374,61 @@ function appendNoteCatalogLink(answer: string, locale: string, noteSlug: string)
   return `${answer}\n\nFiltered catalog for this note: ${path}`;
 }
 
+function getStartingPrice(perfume: Perfume): number {
+  return perfume.sizes[0]?.price ?? Number.POSITIVE_INFINITY;
+}
+
+function extractBudgetBounds(message: string): { min?: number; max?: number } {
+  const normalized = normalizeText(message);
+  const rangeMatch = normalized.match(/(\d{1,4})\s*[-–]\s*(\d{1,4})\s*(?:azn|manat)?/iu);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    if (Number.isFinite(min) && Number.isFinite(max)) {
+      return { min: Math.min(min, max), max: Math.max(min, max) };
+    }
+  }
+
+  const underMatch = normalized.match(/(?:under|up to|below|at most|<=|max(?:imum)?|qeder|qədər|kimi|nedek|до)\s*(\d{1,4})/iu);
+  if (underMatch) {
+    const max = Number(underMatch[1]);
+    if (Number.isFinite(max)) return { max };
+  }
+
+  return {};
+}
+
+function appendFallbackRecommendationLinks(answer: string, locale: string, message: string, perfumes: Perfume[]): string {
+  if (!answer) return answer;
+  if (/\/perfumes\/[a-z0-9-]+/iu.test(answer)) return answer;
+
+  const ranked = selectRelevantPerfumes(message, perfumes);
+  if (!ranked.length) return answer;
+
+  const budget = extractBudgetBounds(message);
+  const budgetFiltered = ranked.filter((perfume) => {
+    const price = getStartingPrice(perfume);
+    if (!Number.isFinite(price)) return false;
+    if (typeof budget.min === "number" && price < budget.min) return false;
+    if (typeof budget.max === "number" && price > budget.max) return false;
+    return true;
+  });
+
+  const picks = (budgetFiltered.length ? budgetFiltered : ranked).slice(0, 3);
+  if (!picks.length) return answer;
+
+  const lines = picks.map((perfume, index) => `${index + 1}. **${perfume.brand} ${perfume.name}** - /perfumes/${perfume.slug}`);
+
+  if (locale === "az") {
+    return `${answer}\n\nKonkret seçimlər:\n${lines.join("\n")}`;
+  }
+  if (locale === "ru") {
+    return `${answer}\n\nКонкретные варианты:\n${lines.join("\n")}`;
+  }
+
+  return `${answer}\n\nConcrete picks:\n${lines.join("\n")}`;
+}
+
 function detectFollowUpIntent(message: string): FollowUpIntent {
   const normalized = normalizeText(message);
 
@@ -2219,6 +2274,9 @@ Rules for personalization and privacy:
     const requestedNoteSlug = resolveRequestedNoteSlug(message, perfumes);
     if (requestedNoteSlug && intent === "recommendation" && hasExplicitNoteIntent(message)) {
       aiResponse = appendNoteCatalogLink(aiResponse, locale, requestedNoteSlug);
+    }
+    if (intent === "recommendation") {
+      aiResponse = appendFallbackRecommendationLinks(aiResponse, locale, message, perfumes);
     }
     const followUp = parsed.followUp.question ? parsed.followUp : null;
 

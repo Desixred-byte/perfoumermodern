@@ -1250,6 +1250,23 @@ function parsePerfumeCards(text: string): RecommendationCard[] {
   return cards.slice(0, 5);
 }
 
+function stripRenderedCardLinksFromText(text: string, cards: RecommendationCard[]): string {
+  if (!cards.length) return text;
+
+  let next = text;
+  for (const card of cards) {
+    const escapedHref = card.href.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    // Remove direct path mentions once they are represented as UI cards.
+    next = next.replace(new RegExp(`\\(?\\s*${escapedHref}\\s*\\)?`, "giu"), "");
+  }
+
+  return next
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 function AssistantContent({
   text,
   onCardClick,
@@ -1258,6 +1275,7 @@ function AssistantContent({
   onCardClick?: (href: string, kind: RecommendationCard["kind"]) => void;
 }) {
   const cards = useMemo(() => parsePerfumeCards(text), [text]);
+  const displayText = useMemo(() => stripRenderedCardLinksFromText(text, cards), [text, cards]);
   const [resolvedByName, setResolvedByName] = useState<Record<string, { href: string; image: string; name: string }>>({});
   const attemptedResolveNamesRef = useRef<Set<string>>(new Set());
   const visibleCards = cards;
@@ -1331,7 +1349,7 @@ function AssistantContent({
   if (visibleCards.length >= 1) {
     return (
       <div className="space-y-2">
-        <RichTextMessage text={text} />
+        <RichTextMessage text={displayText} />
         <div className="space-y-2">
           {visibleCards.map((card, idx) => {
             const resolved = card.kind === "perfume" ? resolvedByName[card.name.toLowerCase()] : undefined;

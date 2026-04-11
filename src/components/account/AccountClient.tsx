@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import {
+  CaretRight,
   Camera,
   ChatCircleDots,
   CircleNotch,
@@ -22,12 +23,15 @@ import {
 } from "@phosphor-icons/react";
 
 import type { Locale } from "@/lib/i18n";
+import { AccountAddressesClient } from "@/components/account/AccountAddressesClient";
+import { AccountOrdersClient } from "@/components/account/AccountOrdersClient";
 import { getSupabaseBrowserClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import type { SupabasePublicConfig } from "@/lib/supabase/client";
 
 type AccountClientProps = {
   locale: Locale;
   supabase: SupabasePublicConfig | null;
+  focusSection?: "all" | "profile" | "email" | "comments" | "addresses" | "orders";
 };
 
 type NoticeTone = "success" | "error" | "info";
@@ -67,6 +71,8 @@ type Copy = {
   configMissing: string;
   profileSaved: string;
   avatarSection: string;
+  addressesSection: string;
+  ordersSection: string;
   uploadAvatar: string;
   avatarHint: string;
   avatarUploading: string;
@@ -195,6 +201,8 @@ const copyByLocale: Record<Locale, Copy> = {
     configMissing: "Supabase konfiqurasiyası yoxdur.",
     profileSaved: "Profil məlumatları yeniləndi.",
     avatarSection: "Profil şəkli",
+    addressesSection: "Yadda saxlanmış ünvanlar",
+    ordersSection: "Keçmiş sifarişlər",
     uploadAvatar: "Şəkil yüklə",
     avatarHint: "PNG, JPG və WEBP. Maksimum 4MB.",
     avatarUploading: "Şəkil yüklənir...",
@@ -262,6 +270,8 @@ const copyByLocale: Record<Locale, Copy> = {
     configMissing: "Supabase configuration is missing.",
     profileSaved: "Profile details updated.",
     avatarSection: "Profile photo",
+    addressesSection: "Saved addresses",
+    ordersSection: "Past orders",
     uploadAvatar: "Upload photo",
     avatarHint: "PNG, JPG, or WEBP. Max 4MB.",
     avatarUploading: "Uploading photo...",
@@ -329,6 +339,8 @@ const copyByLocale: Record<Locale, Copy> = {
     configMissing: "Конфигурация Supabase отсутствует.",
     profileSaved: "Данные профиля обновлены.",
     avatarSection: "Фото профиля",
+    addressesSection: "Сохраненные адреса",
+    ordersSection: "История заказов",
     uploadAvatar: "Загрузить фото",
     avatarHint: "PNG, JPG или WEBP. Максимум 4MB.",
     avatarUploading: "Загрузка фото...",
@@ -365,7 +377,7 @@ const copyByLocale: Record<Locale, Copy> = {
   },
 };
 
-export function AccountClient({ locale, supabase: supabaseConfig }: AccountClientProps) {
+export function AccountClient({ locale, supabase: supabaseConfig, focusSection = "all" }: AccountClientProps) {
   const copy = copyByLocale[locale];
   const router = useRouter();
   const supabase = getSupabaseBrowserClient(supabaseConfig ?? undefined);
@@ -402,6 +414,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isDomReady, setIsDomReady] = useState(false);
   const [editMode, setEditMode] = useState<"username" | "email" | null>(null);
+  const [activeSection, setActiveSection] = useState<"profile" | "email" | "comments" | "addresses" | "orders" | null>(
+    focusSection === "all" ? null : focusSection,
+  );
   const otpRefs = useRef<Array<HTMLInputElement | null>>([]);
   const profileResetTimerRef = useRef<number | null>(null);
   const emailResetTimerRef = useRef<number | null>(null);
@@ -409,6 +424,17 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
     () => Array.from({ length: OTP_LENGTH }, (_, index) => code[index] ?? ""),
     [code],
   );
+  useEffect(() => {
+    if (focusSection === "all") return;
+    setActiveSection(focusSection);
+  }, [focusSection]);
+
+  const showProfileSection = focusSection === "all" ? activeSection === "profile" : focusSection === "profile";
+  const showEmailSection = focusSection === "all" ? activeSection === "email" : focusSection === "email";
+  const showCommentsSection = focusSection === "all" ? activeSection === "comments" : focusSection === "comments";
+  const showAddressesSection = focusSection === "all" ? activeSection === "addresses" : focusSection === "addresses";
+  const showOrdersSection = focusSection === "all" ? activeSection === "orders" : focusSection === "orders";
+  const panelKey = focusSection === "all" ? activeSection ?? "menu" : focusSection;
 
   useEffect(() => {
     if (!supabase) {
@@ -438,7 +464,15 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
     });
   }, [supabase]);
 
-  const loginHref = "/login?next=%2Faccount";
+  const loginTargetPath =
+    focusSection === "profile"
+      ? "/account/profile"
+      : focusSection === "email"
+        ? "/account/email"
+        : focusSection === "comments"
+          ? "/account/comments"
+          : "/account";
+  const loginHref = `/login?next=${encodeURIComponent(loginTargetPath)}`;
   const normalizedUsername = username.trim();
   const normalizedInitialUsername = initialUsername.trim();
   const normalizedCurrentEmail = email.trim().toLowerCase();
@@ -1014,23 +1048,107 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
   }
 
   return (
-    <div className="space-y-5">
-      <section className="rounded-[1.8rem] bg-white p-7 shadow-[0_10px_32px_rgba(0,0,0,0.04)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_14px_36px_rgba(0,0,0,0.07)]">
-        <h1 className="text-4xl tracking-[-0.03em] text-zinc-900">{copy.title}</h1>
-        <p className="mt-2 text-zinc-500">{copy.subtitle}</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700">
-            <UserCircle size={14} weight="duotone" />
-            {copy.profile}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-700">
-            <EnvelopeSimple size={14} weight="duotone" />
-            {copy.emailSection}
-          </span>
+    <div
+      key={`settings-panel-${panelKey}`}
+      className="mx-auto max-w-[880px] space-y-3.5 animate-[settingsPanelIn_420ms_cubic-bezier(0.22,1,0.36,1)]"
+    >
+      {focusSection === "all" && activeSection === null ? <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-4 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-5">
+        <div className="flex items-center gap-3">
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={copy.avatarSection}
+              className="h-14 w-14 rounded-full object-cover ring-1 ring-zinc-200"
+            />
+          ) : (
+            <div className="grid h-14 w-14 place-items-center rounded-full bg-zinc-200 text-base font-semibold text-zinc-700">
+              {normalizedUsername.slice(0, 1).toUpperCase() || "U"}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-[1.35rem] tracking-[-0.02em] text-zinc-900">{copy.title}</h1>
+            <p className="truncate text-sm text-zinc-500">{email}</p>
+          </div>
         </div>
-      </section>
 
-      <section className="rounded-[1.8rem] border border-zinc-200/80 bg-[linear-gradient(160deg,#ffffff_0%,#f8f8f7_100%)] p-7 shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+        <div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-50/70">
+          <button
+            type="button"
+            onClick={() => setActiveSection("profile")}
+            className={`group flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              activeSection === "profile"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-800 hover:bg-gradient-to-r hover:from-zinc-100 hover:via-zinc-50 hover:to-white hover:pl-[1.15rem] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] active:scale-[0.996]"
+            }`}
+          >
+            <span className="inline-flex items-center gap-2"><UserCircle size={16} weight="duotone" />{copy.profile}</span>
+            <CaretRight size={16} className="text-zinc-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-zinc-700" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("email")}
+            className={`group flex w-full items-center justify-between border-t border-zinc-200 px-4 py-3 text-left text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              activeSection === "email"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-800 hover:bg-gradient-to-r hover:from-zinc-100 hover:via-zinc-50 hover:to-white hover:pl-[1.15rem] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] active:scale-[0.996]"
+            }`}
+          >
+            <span className="inline-flex items-center gap-2"><EnvelopeSimple size={16} weight="duotone" />{copy.emailSection}</span>
+            <CaretRight size={16} className="text-zinc-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-zinc-700" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("comments")}
+            className={`group flex w-full items-center justify-between border-t border-zinc-200 px-4 py-3 text-left text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              activeSection === "comments"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-800 hover:bg-gradient-to-r hover:from-zinc-100 hover:via-zinc-50 hover:to-white hover:pl-[1.15rem] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] active:scale-[0.996]"
+            }`}
+          >
+            <span className="inline-flex items-center gap-2"><ChatCircleDots size={16} weight="duotone" />{copy.commentsSection}</span>
+            <CaretRight size={16} className="text-zinc-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-zinc-700" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("addresses")}
+            className={`group flex w-full items-center justify-between border-t border-zinc-200 px-4 py-3 text-left text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              activeSection === "addresses"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-800 hover:bg-gradient-to-r hover:from-zinc-100 hover:via-zinc-50 hover:to-white hover:pl-[1.15rem] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] active:scale-[0.996]"
+            }`}
+          >
+            <span className="inline-flex items-center gap-2"><Info size={16} weight="duotone" />{copy.addressesSection}</span>
+            <CaretRight size={16} className="text-zinc-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-zinc-700" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection("orders")}
+            className={`group flex w-full items-center justify-between border-t border-zinc-200 px-4 py-3 text-left text-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+              activeSection === "orders"
+                ? "bg-zinc-100 text-zinc-900"
+                : "text-zinc-800 hover:bg-gradient-to-r hover:from-zinc-100 hover:via-zinc-50 hover:to-white hover:pl-[1.15rem] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] active:scale-[0.996]"
+            }`}
+          >
+            <span className="inline-flex items-center gap-2"><Info size={16} weight="duotone" />{copy.ordersSection}</span>
+            <CaretRight size={16} className="text-zinc-500 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-zinc-700" />
+          </button>
+        </div>
+      </section> : null}
+
+      {focusSection === "all" && activeSection !== null ? (
+        <div className="animate-[fadeIn_260ms_ease]">
+          <button
+            type="button"
+            onClick={() => setActiveSection(null)}
+            className="mb-3 inline-flex min-h-10 items-center justify-center gap-1.5 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition duration-300 hover:-translate-y-[1px] hover:bg-zinc-50"
+          >
+            <CaretRight size={14} className="rotate-180" />
+            {copy.settings}
+          </button>
+        </div>
+      ) : null}
+
+      {showProfileSection ? <section id="account-profile" className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold tracking-[0.12em] text-zinc-500 uppercase">{copy.profile}</p>
           <div className="flex items-center gap-2">
@@ -1046,7 +1164,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   setIsProfileMenuOpen((prev) => !prev);
                   setIsEmailMenuOpen(false);
                 }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition-colors duration-200 hover:bg-zinc-50"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-[0_10px_18px_rgba(20,20,20,0.08)] active:scale-[0.96]"
                 aria-label={editMode === "username" ? copy.cancelEdit : copy.settings}
                 aria-expanded={editMode === "username" ? true : isProfileMenuOpen}
               >
@@ -1072,9 +1190,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   <button
                     type="button"
                     onClick={() => activateEditMode("username")}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-100"
+                    className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-100 hover:text-zinc-900 hover:shadow-[0_10px_22px_rgba(20,20,20,0.08)]"
                   >
-                    <PencilSimple size={15} />
+                    <PencilSimple size={15} className="transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110" />
                     {copy.editUsername}
                   </button>
                 </div>
@@ -1117,7 +1235,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
               </p>
             ) : null}
           </div>
-          <label className="relative z-[1] inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-100">
+          <label className="relative z-[1] inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:border-zinc-400 hover:bg-zinc-100 hover:shadow-[0_10px_22px_rgba(20,20,20,0.08)] active:scale-[0.985]">
             {isAvatarBusy ? <CircleNotch size={15} className="animate-spin" /> : <Camera size={15} />}
             {copy.uploadAvatar}
             <input
@@ -1186,9 +1304,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
             </button>
           </div>
         ) : null}
-      </section>
+      </section> : null}
 
-      <section className="rounded-[1.8rem] border border-zinc-200/80 bg-[linear-gradient(160deg,#ffffff_0%,#f8f8f7_100%)] p-7 shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+      {showEmailSection ? <section id="account-email" className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <div className="flex items-center justify-between gap-3">
           <p className="text-sm font-semibold tracking-[0.12em] text-zinc-500 uppercase">{copy.emailSection}</p>
           <div className="flex items-center gap-2">
@@ -1204,7 +1322,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   setIsEmailMenuOpen((prev) => !prev);
                   setIsProfileMenuOpen(false);
                 }}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition-colors duration-200 hover:bg-zinc-50"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700 shadow-sm transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:border-zinc-300 hover:bg-zinc-50 hover:shadow-[0_10px_18px_rgba(20,20,20,0.08)] active:scale-[0.96]"
                 aria-label={editMode === "email" ? copy.cancelEdit : copy.settings}
                 aria-expanded={editMode === "email" ? true : isEmailMenuOpen}
               >
@@ -1230,9 +1348,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   <button
                     type="button"
                     onClick={() => activateEditMode("email")}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-100"
+                    className="group flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-100 hover:text-zinc-900 hover:shadow-[0_10px_22px_rgba(20,20,20,0.08)]"
                   >
-                    <EnvelopeSimple size={15} />
+                    <EnvelopeSimple size={15} className="transition-transform duration-300 group-hover:rotate-[-8deg] group-hover:scale-110" />
                     {copy.editEmail}
                   </button>
                 </div>
@@ -1340,9 +1458,9 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
             </button>
           </div>
         ) : null}
-      </section>
+      </section> : null}
 
-      <section className="rounded-[1.8rem] border border-zinc-200/80 bg-[linear-gradient(150deg,#ffffff_0%,#f6f6f4_100%)] p-7 shadow-[0_12px_32px_rgba(0,0,0,0.05)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_18px_40px_rgba(0,0,0,0.08)]">
+      {showCommentsSection ? <section id="account-comments" className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold tracking-[0.12em] text-zinc-500 uppercase">{copy.commentsSection}</p>
@@ -1427,7 +1545,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                         requestDeleteHistoryComment(item.id);
                       }}
                       disabled={deletingHistoryCommentId === item.id}
-                      className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-colors duration-200 hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-800 hover:shadow-[0_10px_18px_rgba(20,20,20,0.08)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <Trash size={12} />
                       {deletingHistoryCommentId === item.id ? copy.commentsDeleting : copy.commentsDelete}
@@ -1438,9 +1556,12 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
             })}
           </div>
         ) : null}
-      </section>
+      </section> : null}
 
-      <section className="rounded-[1.8rem] bg-white p-7 shadow-[0_10px_32px_rgba(0,0,0,0.04)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:shadow-[0_14px_36px_rgba(0,0,0,0.07)]">
+      {showAddressesSection ? <AccountAddressesClient locale={locale} supabase={supabaseConfig} /> : null}
+      {showOrdersSection ? <AccountOrdersClient locale={locale} /> : null}
+
+      <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <button
           type="button"
           onClick={() => setIsLogoutConfirmOpen(true)}
@@ -1504,7 +1625,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
               <button
                 type="button"
                 onClick={() => setIsLogoutConfirmOpen(false)}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-50 sm:min-h-10 sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-50 hover:shadow-[0_10px_20px_rgba(20,20,20,0.08)] sm:min-h-10 sm:w-auto"
               >
                 {copy.logoutCancel}
               </button>
@@ -1514,7 +1635,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   setIsLogoutConfirmOpen(false);
                   await signOut();
                 }}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-zinc-800 sm:min-h-10 sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-800 hover:shadow-[0_14px_28px_rgba(24,24,24,0.22)] sm:min-h-10 sm:w-auto"
               >
                 {copy.logoutConfirm}
               </button>
@@ -1541,7 +1662,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
               <button
                 type="button"
                 onClick={() => setPendingDeleteHistoryCommentId("")}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-colors duration-200 hover:bg-zinc-50 sm:min-h-10 sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full border border-zinc-300 bg-white px-4 text-sm font-medium text-zinc-700 transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-50 hover:shadow-[0_10px_20px_rgba(20,20,20,0.08)] sm:min-h-10 sm:w-auto"
               >
                 {copy.logoutCancel}
               </button>
@@ -1551,7 +1672,7 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
                   void confirmDeleteHistoryComment();
                 }}
                 disabled={deletingHistoryCommentId === pendingDeleteHistoryCommentId}
-                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-colors duration-200 hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10 sm:w-auto"
+                className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-zinc-900 px-5 text-sm font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:-translate-y-[1px] hover:bg-zinc-800 hover:shadow-[0_14px_28px_rgba(24,24,24,0.22)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10 sm:w-auto"
               >
                 {deletingHistoryCommentId === pendingDeleteHistoryCommentId ? copy.commentsDeleting : copy.commentsDeleteAction}
               </button>
@@ -1561,6 +1682,13 @@ export function AccountClient({ locale, supabase: supabaseConfig }: AccountClien
         document.body,
       )
         : null}
+
+      <style>{`
+        @keyframes settingsPanelIn {
+          0% { opacity: 0; transform: translateY(10px) scale(0.992); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </div>
   );
 }

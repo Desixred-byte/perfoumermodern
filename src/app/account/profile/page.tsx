@@ -6,14 +6,14 @@ import { getCurrentLocale } from "@/lib/i18n.server";
 import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
 
 export const metadata: Metadata = {
-  title: "Hesabım",
+  title: "Hesabım - Profil",
   robots: {
     index: false,
     follow: false,
   },
 };
 
-export default async function AccountPage() {
+export default async function AccountProfilePage() {
   const locale = await getCurrentLocale();
   const supabaseConfig = getSupabasePublicConfigFromServer();
 
@@ -21,7 +21,7 @@ export default async function AccountPage() {
     <div className="bg-[#f3f3f2]">
       <div className="mx-auto max-w-[1540px] px-6 pb-6 md:px-10 md:pb-8">
         <section className="pt-8 pb-4 md:pb-5">
-          <AccountClient locale={locale} supabase={supabaseConfig} focusSection="all" />
+          <AccountClient locale={locale} supabase={supabaseConfig} focusSection="profile" />
         </section>
       </div>
 
