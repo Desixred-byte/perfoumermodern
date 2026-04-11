@@ -117,14 +117,20 @@ export default async function PerfumeDetailPage({
   return (
     <div className="detail-page-enter bg-[#f3f3f2]">
       <ScrollToTopOnMount />
-      <div className="mx-auto max-w-[1540px] px-6 md:px-10">
+      <div className="mx-auto max-w-[1540px] px-6 pt-2 sm:pt-4 md:px-10">
+        <div className="hidden xl:flex xl:pb-5">
+          <DetailBackButton locale={locale} />
+        </div>
+
         <div className="grid gap-8 xl:grid-cols-[0.98fr_1fr] xl:gap-12 xl:items-start">
           <div className="self-start xl:sticky xl:top-32">
             <PerfumeHeroCover src={perfume.image} alt={perfume.imageAlt || perfume.name} />
           </div>
 
-          <div className="space-y-6 xl:pt-2">
-            <DetailBackButton locale={locale} />
+          <div className="space-y-6">
+            <div className="xl:hidden">
+              <DetailBackButton locale={locale} />
+            </div>
 
             <p className="flex flex-wrap items-center gap-2 text-[1.05rem] text-zinc-500">
               <span className="inline-flex items-center gap-1.5">

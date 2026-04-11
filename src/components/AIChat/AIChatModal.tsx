@@ -1143,7 +1143,7 @@ function emitWishlistUpdated() {
 function parseInternalLinkCards(text: string): RecommendationCard[] {
   const cards: RecommendationCard[] = [];
   const bestHrefByBasePath = new Map<string, string>();
-  const pathRegex = /(https?:\/\/(?:www\.)?(?:perfoumer\.az|perfoumerweb\.com))?(\/(?:catalog|brands|wishlist|compare|cart|account|qoxunu)(?:[/?#][^\s)]*)?)/giu;
+  const pathRegex = /(https?:\/\/(?:www\.)?(?:perfoumer\.az|perfoumerweb\.com))?(\/(?:catalog|brands|wishlist|compare|cart|account|qoxunu|perfumes\/[a-z0-9-]+)(?:[/?#][^\s)]*)?)/giu;
 
   let match: RegExpExecArray | null;
   while ((match = pathRegex.exec(text)) !== null) {
@@ -1158,9 +1158,10 @@ function parseInternalLinkCards(text: string): RecommendationCard[] {
   }
 
   for (const href of bestHrefByBasePath.values()) {
+    const isPerfumePath = href.startsWith("/perfumes/");
 
     cards.push({
-      kind: "internal-link",
+      kind: isPerfumePath ? "perfume" : "internal-link",
       name: titleFromInternalPath(href),
       details: href,
       href,
@@ -1258,14 +1259,8 @@ function AssistantContent({
 }) {
   const cards = useMemo(() => parsePerfumeCards(text), [text]);
   const [resolvedByName, setResolvedByName] = useState<Record<string, { href: string; image: string; name: string }>>({});
-  const visibleCards = useMemo(
-    () =>
-      cards.filter((card) => {
-        if (card.kind === "internal-link") return true;
-        return Boolean(resolvedByName[card.name.toLowerCase()]);
-      }),
-    [cards, resolvedByName]
-  );
+  const attemptedResolveNamesRef = useRef<Set<string>>(new Set());
+  const visibleCards = cards;
 
   const perfumeNamesToResolve = useMemo(
     () => cards.filter((card) => card.kind === "perfume").map((card) => card.name),
@@ -1273,13 +1268,22 @@ function AssistantContent({
   );
 
   useEffect(() => {
-    const perfumeNames = perfumeNamesToResolve.filter((name) => {
-      const key = name.toLowerCase();
-      if (resolvedByName[key]) return false;
-      return true;
-    });
+    const perfumeNames = Array.from(new Set(perfumeNamesToResolve))
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .filter((name) => {
+        const key = name.toLowerCase();
+        if (resolvedByName[key]) return false;
+        // Avoid re-requesting unresolved names on subsequent renders.
+        if (attemptedResolveNamesRef.current.has(key)) return false;
+        return true;
+      });
 
     if (!perfumeNames.length) return;
+
+    for (const name of perfumeNames) {
+      attemptedResolveNamesRef.current.add(name.toLowerCase());
+    }
 
     let isActive = true;
 
@@ -1312,7 +1316,10 @@ function AssistantContent({
           return next;
         });
       } catch {
-        // Keep fallback card behavior if resolver fails.
+        // Allow retry on transient network failures.
+        for (const name of perfumeNames) {
+          attemptedResolveNamesRef.current.delete(name.toLowerCase());
+        }
       }
     })();
 
@@ -1421,15 +1428,27 @@ function useTypewriter(sourceText: string, shouldAnimate: boolean) {
       setVisibleText("");
       let index = 0;
 
+      const nextDelay = (latestChar: string) => {
+        if (/[.!?]/.test(latestChar)) return 130;
+        if (/[,;:]/.test(latestChar)) return 90;
+        if (/\n/.test(latestChar)) return 120;
+        if (/\s/.test(latestChar)) return 35;
+        return 24;
+      };
+
       const step = () => {
-        index += 2;
-        setVisibleText(sourceText.slice(0, index));
+        // Advance by one character for a more natural sentence-like typing cadence.
+        index += 1;
+        const slice = sourceText.slice(0, index);
+        setVisibleText(slice);
+
         if (index < sourceText.length) {
-          timeoutId = window.setTimeout(step, 16);
+          const latestChar = slice[slice.length - 1] ?? "";
+          timeoutId = window.setTimeout(step, nextDelay(latestChar));
         }
       };
 
-      timeoutId = window.setTimeout(step, 50);
+      timeoutId = window.setTimeout(step, 120);
     });
 
     return () => {
@@ -1452,6 +1471,10 @@ function AnimatedAssistantText({
 }) {
   const hasCards = useMemo(() => parsePerfumeCards(text).length > 0, [text]);
   const visibleText = useTypewriter(text, animate);
+
+  if (hasCards && animate && visibleText !== text) {
+    return <RichTextMessage text={visibleText} />;
+  }
 
   if (hasCards) {
     return <AssistantContent text={text} onCardClick={onCardClick} />;

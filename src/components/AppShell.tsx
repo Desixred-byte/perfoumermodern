@@ -16,13 +16,12 @@ export function AppShell({ children, locale }: AppShellProps) {
   const pathname = usePathname();
   const isHomePage = pathname === "/";
   const isQoxunuPage = pathname.startsWith("/qoxunu");
-  const [isRouteLoading, setIsRouteLoading] = useState(true);
+  const [loadedPathname, setLoadedPathname] = useState(pathname);
+  const isRouteLoading = loadedPathname !== pathname;
 
   useEffect(() => {
-    setIsRouteLoading(true);
-
     const timer = window.setTimeout(() => {
-      setIsRouteLoading(false);
+      setLoadedPathname(pathname);
     }, 320);
 
     return () => {
@@ -65,7 +64,7 @@ export function AppShell({ children, locale }: AppShellProps) {
         key={pathname}
         className={[
           "route-page-enter",
-          isHomePage || isQoxunuPage ? "" : "pt-[4.25rem] sm:pt-[5.75rem]",
+          isHomePage || isQoxunuPage ? "" : "pt-[4.25rem] sm:pt-[6.2rem]",
         ].join(" ")}
       >
         {children}

@@ -260,16 +260,13 @@ export function PerfumePurchasePanel({
 
   return (
     <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-[2.05rem] border border-zinc-200/80 bg-[linear-gradient(155deg,#ffffff_0%,#fafafa_52%,#f2f2f2_100%)] shadow-[0_24px_58px_rgba(24,24,24,0.08)] ring-1 ring-zinc-200/70">
-        <div className="pointer-events-none absolute -top-16 -right-12 h-40 w-40 rounded-full bg-[radial-gradient(circle,#e5e5e5_0%,rgba(229,229,229,0)_70%)]" />
-        <div className="pointer-events-none absolute -bottom-12 -left-14 h-36 w-36 rounded-full bg-[radial-gradient(circle,#f1f1f1_0%,rgba(241,241,241,0)_70%)]" />
-
-        <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200/80 px-4 py-4 md:px-6">
+      <div className="overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-4 md:px-6">
           <p className="text-[0.72rem] font-medium tracking-[0.22em] text-zinc-500 uppercase">
             {t.detail.sizePrice}
           </p>
           {selectedSize ? (
-            <p className="rounded-full border border-zinc-300 bg-white px-3 py-1 text-[0.78rem] font-medium tracking-[0.04em] text-zinc-700">
+            <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[0.78rem] font-medium tracking-[0.02em] text-zinc-700">
               {copy.selectedSize}: {selectedSize.ml}ml
             </p>
           ) : (
@@ -278,7 +275,7 @@ export function PerfumePurchasePanel({
         </div>
 
         {sizes.length ? (
-          <div className="grid grid-cols-3 gap-1.5 p-2 md:gap-2.5 md:p-3">
+          <div className="grid grid-cols-3 gap-2 p-3 md:gap-3 md:p-4">
             {sizes.map((size) => {
               const isSelected = selectedSize?.ml === size.ml;
               const isBestValue = bestValueMl === size.ml;
@@ -303,10 +300,10 @@ export function PerfumePurchasePanel({
                   type="button"
                   onClick={() => setSelectedMl(size.ml)}
                   className={[
-                    "group relative overflow-hidden rounded-[1rem] border p-2 text-left transition-all duration-300 md:rounded-[1.35rem] md:p-3.5",
+                    "group relative overflow-hidden rounded-[0.95rem] border p-2 text-left transition-colors duration-200 md:rounded-[1.1rem] md:p-3",
                     isSelected
-                      ? "border-zinc-700 bg-[linear-gradient(160deg,#111111_0%,#262626_100%)] text-zinc-100 shadow-[0_16px_34px_rgba(24,24,24,0.34)]"
-                      : "border-zinc-200 bg-[linear-gradient(160deg,#ffffff_0%,#f7f7f7_100%)] text-zinc-900 shadow-[0_8px_18px_rgba(24,24,24,0.06)] hover:-translate-y-0.5 hover:border-zinc-300 hover:shadow-[0_14px_28px_rgba(24,24,24,0.1)]",
+                      ? "border-zinc-900 bg-zinc-900 text-zinc-100"
+                      : "border-zinc-200 bg-zinc-50 text-zinc-900 hover:border-zinc-300 hover:bg-white",
                   ].join(" ")}
                   aria-pressed={isSelected}
                 >
@@ -328,7 +325,7 @@ export function PerfumePurchasePanel({
                         <span
                           className={[
                             "hidden rounded-full px-2 py-1 text-[0.58rem] font-medium tracking-[0.14em] uppercase md:inline-flex",
-                            isSelected ? "bg-white/12 text-zinc-200" : "bg-zinc-100 text-zinc-700",
+                            isSelected ? "bg-white/12 text-zinc-200" : "bg-zinc-200 text-zinc-700",
                           ].join(" ")}
                         >
                           {copy.bestValue}
@@ -341,7 +338,7 @@ export function PerfumePurchasePanel({
                         aria-hidden="true"
                         className={[
                           "absolute left-1/2 bottom-0 h-2 w-[78%] -translate-x-1/2 rounded-full blur-[1px]",
-                          isSelected ? "bg-black/55" : "bg-zinc-500/30",
+                          isSelected ? "bg-black/50" : "bg-zinc-500/20",
                         ].join(" ")}
                       />
                       <Image
@@ -350,8 +347,8 @@ export function PerfumePurchasePanel({
                         fill
                         sizes="(max-width: 767px) 52px, 96px"
                         className={[
-                          "object-contain object-bottom drop-shadow-[0_10px_12px_rgba(19,14,10,0.22)] transition-all duration-300 md:drop-shadow-[0_16px_20px_rgba(19,14,10,0.26)]",
-                          isSelected ? "scale-[1.04] opacity-100" : "opacity-92 group-hover:scale-[1.06]",
+                          "object-contain object-bottom drop-shadow-[0_6px_10px_rgba(19,14,10,0.18)] transition-all duration-200 md:drop-shadow-[0_10px_14px_rgba(19,14,10,0.2)]",
+                          isSelected ? "scale-[1.02] opacity-100" : "opacity-90 group-hover:opacity-100",
                         ].join(" ")}
                       />
                     </div>
@@ -360,7 +357,7 @@ export function PerfumePurchasePanel({
                   <div className="relative mt-1.5 md:mt-2.5">
                     <p className="text-[1.18rem] leading-none tracking-[-0.05em] font-[family-name:var(--font-playfair)] md:text-[1.74rem]">
                       {size.price}
-                      <span className={isSelected ? "ml-1 text-[0.62em] text-zinc-300" : "ml-1 text-[0.62em] text-zinc-600"}>
+                      <span className={isSelected ? "ml-1 text-[0.62em] text-zinc-300" : "ml-1 text-[0.62em] text-zinc-500"}>
                         ₼
                       </span>
                     </p>
@@ -371,13 +368,13 @@ export function PerfumePurchasePanel({
                     <div
                       className={[
                         "mt-2 h-1 overflow-hidden rounded-full md:mt-3 md:h-2",
-                        isSelected ? "bg-white/18" : "bg-zinc-200/70",
+                        isSelected ? "bg-white/20" : "bg-zinc-200",
                       ].join(" ")}
                     >
                       <span
                         className={[
                           "block h-full rounded-full transition-all duration-500",
-                          isSelected ? "bg-zinc-100" : "bg-zinc-700",
+                          isSelected ? "bg-zinc-100" : "bg-zinc-500",
                         ].join(" ")}
                         style={{ width: `${fillLevel}%` }}
                       />

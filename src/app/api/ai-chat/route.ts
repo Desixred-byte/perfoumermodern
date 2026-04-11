@@ -2081,6 +2081,14 @@ ${relevantCatalogContext}
 
 When users ask about fragrances or recommendations, prefer exact products from the relevant catalog context above.
 If the relevant catalog context says no strong direct matches were ranked, say that clearly instead of inventing products.
+When naming a recommended perfume, include its internal product path in the same line when available (example: /perfumes/slug).
+When recommendation constraints exist, include one catalog link that preserves those constraints via query params:
+- budget upper bound: /catalog?max=30
+- budget range: /catalog?min=20&max=40
+- note preference: /catalog?note=vanilla
+- brand filter: /catalog?brand=lattafa
+- text intent/style: /catalog?q=fresh+daily
+Combine params when useful (example: /catalog?q=fresh&max=30&brand=lattafa). If no clear filter is needed, use /catalog.
 Keep answers natural, intelligent, and specific.`;
 
     const userContext = await resolveSecureUserContext(request, sanitizeUserContext(body.userContext));

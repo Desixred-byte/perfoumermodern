@@ -38,6 +38,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly",
       priority: 0.72,
     },
+    {
+      url: absoluteUrl("/refund-policy"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.48,
+    },
+    {
+      url: absoluteUrl("/terms-and-conditions"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.48,
+    },
+    {
+      url: absoluteUrl("/privacy-policy"),
+      lastModified: now,
+      changeFrequency: "monthly",
+      priority: 0.48,
+    },
   ];
 
   const perfumeRoutes: MetadataRoute.Sitemap = perfumes.map((perfume) => ({

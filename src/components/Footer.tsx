@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { getDictionary, type Locale } from "@/lib/i18n";
+import { getLegalPageLinks } from "@/lib/legal";
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
@@ -16,6 +17,7 @@ export function Footer({ locale }: FooterProps) {
   const footerRef = useRef<HTMLElement | null>(null);
   const [progress, setProgress] = useState(0);
   const t = getDictionary(locale);
+  const legalLinks = getLegalPageLinks(locale);
 
   useEffect(() => {
     let raf = 0;
@@ -81,7 +83,18 @@ export function Footer({ locale }: FooterProps) {
               </div>
             </div>
 
-            <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-end md:gap-14">
+            <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-end md:gap-12">
+              <div className="text-center md:text-right">
+                <p className="text-[0.88rem] font-medium tracking-[0.06em] text-zinc-500 uppercase">Legal</p>
+                <nav aria-label="Legal pages" className="mt-5 flex flex-col items-center gap-2.5 text-base leading-[1.3] text-zinc-600 md:items-end">
+                  {legalLinks.map((link) => (
+                    <Link key={link.slug} href={link.href} className="transition-colors hover:text-zinc-900">
+                      {link.label}
+                    </Link>
+                  ))}
+                </nav>
+              </div>
+
               <div className="text-center md:text-right">
                 <p className="text-[0.88rem] font-medium tracking-[0.06em] text-zinc-500 uppercase">{t.footer.pages}</p>
                 <nav className="mt-5 flex flex-col items-center gap-2.5 text-base leading-[1.3] text-zinc-600 md:items-end">
@@ -131,7 +144,7 @@ export function Footer({ locale }: FooterProps) {
                 © 2026 Bakhishov Brands <span className="mx-2">—</span> Perfoumer.az
               </a>
               <p
-                className="footer-wordmark footer-wordmark-animated select-none whitespace-nowrap leading-[0.78] text-zinc-800 will-change-transform"
+                className="footer-wordmark footer-wordmark-animated mt-2 select-none whitespace-nowrap leading-[0.78] text-zinc-800 will-change-transform"
                 style={{
                   ...wordmarkStyle,
                   fontSize: "clamp(4.8rem, 16vw, 16rem)",

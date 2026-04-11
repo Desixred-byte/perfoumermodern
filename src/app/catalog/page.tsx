@@ -25,8 +25,15 @@ export const metadata: Metadata = {
 };
 
 type CatalogPageProps = {
-  searchParams: Promise<{ brand?: string; q?: string; note?: string }>;
+  searchParams: Promise<{ brand?: string; q?: string; note?: string; min?: string; max?: string }>;
 };
+
+function parsePriceParam(value: string | undefined): number | undefined {
+  if (typeof value !== "string") return undefined;
+  const parsed = Number(value.trim());
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return Math.round(parsed);
+}
 
 function noteLabelFromSlug(slug: string): string {
   return slug
@@ -39,10 +46,12 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const perfumes = await getPerfumes();
-  const { brand, q, note } = await searchParams;
+  const { brand, q, note, min, max } = await searchParams;
   const normalizedBrand = brand?.trim().toLowerCase();
   const initialQuery = typeof q === "string" ? q.trim() : "";
   const normalizedNote = typeof note === "string" ? note.trim().toLowerCase() : "";
+  const initialMinPrice = parsePriceParam(min);
+  const initialMaxPrice = parsePriceParam(max);
   const initialBrand =
     perfumes.find((perfume) => perfume.brand.toLowerCase() === normalizedBrand)?.brand ??
     "all";
@@ -87,6 +96,8 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
           lockedNoteFilter={lockedNoteFilter}
           initialBrand={initialBrand}
           initialQuery={initialQuery}
+          initialMinPrice={initialMinPrice}
+          initialMaxPrice={initialMaxPrice}
           locale={locale}
         />
       </main>

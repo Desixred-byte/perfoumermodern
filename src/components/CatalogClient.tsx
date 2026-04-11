@@ -35,6 +35,8 @@ type CatalogClientProps = {
   lockedNoteFilter?: LockedNoteFilter;
   initialBrand?: string;
   initialQuery?: string;
+  initialMinPrice?: number;
+  initialMaxPrice?: number;
   locale: Locale;
 };
 
@@ -160,6 +162,8 @@ export function CatalogClient({
   lockedNoteFilter,
   initialBrand = "all",
   initialQuery = "",
+  initialMinPrice,
+  initialMaxPrice,
   locale,
 }: CatalogClientProps) {
   const t = getDictionary(locale);
@@ -177,6 +181,12 @@ export function CatalogClient({
   );
   const [selectedBaseNote, setSelectedBaseNote] = useState(
     lockedNoteFilter?.type === "base" ? lockedNoteFilter.slug : "all",
+  );
+  const [selectedMinPrice, setSelectedMinPrice] = useState<number | null>(
+    Number.isFinite(initialMinPrice) ? Math.max(0, Number(initialMinPrice)) : null,
+  );
+  const [selectedMaxPrice, setSelectedMaxPrice] = useState<number | null>(
+    Number.isFinite(initialMaxPrice) ? Math.max(0, Number(initialMaxPrice)) : null,
   );
   const [sortBy, setSortBy] = useState("featured");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -208,6 +218,11 @@ export function CatalogClient({
     setSuggestionQuery(nextQuery);
     setVisibleCount(PAGE_SIZE);
   }, [initialQuery]);
+
+  useEffect(() => {
+    setSelectedMinPrice(Number.isFinite(initialMinPrice) ? Math.max(0, Number(initialMinPrice)) : null);
+    setSelectedMaxPrice(Number.isFinite(initialMaxPrice) ? Math.max(0, Number(initialMaxPrice)) : null);
+  }, [initialMinPrice, initialMaxPrice]);
 
   const triggerRefresh = () => {
     setVisibleCount(PAGE_SIZE);
@@ -268,6 +283,8 @@ export function CatalogClient({
   const resetFilters = () => {
     setQuery("");
     setDraftQuery("");
+    setSelectedMinPrice(null);
+    setSelectedMaxPrice(null);
     startTransition(() => {
       setSelectedGender("all");
       setSelectedBrand(initialBrand);
@@ -416,13 +433,19 @@ export function CatalogClient({
       const matchesBaseNote =
         selectedBaseNote === "all" || perfume.noteSlugs.base.includes(selectedBaseNote);
 
+      const startingPrice = getStartingPrice(perfume);
+      const matchesMinPrice = selectedMinPrice === null || startingPrice >= selectedMinPrice;
+      const matchesMaxPrice = selectedMaxPrice === null || startingPrice <= selectedMaxPrice;
+
       return (
         matchesQuery &&
         matchesGender &&
         matchesBrand &&
         matchesTopNote &&
         matchesHeartNote &&
-        matchesBaseNote
+        matchesBaseNote &&
+        matchesMinPrice &&
+        matchesMaxPrice
       );
     });
 
@@ -446,6 +469,8 @@ export function CatalogClient({
     selectedBrand,
     selectedGender,
     selectedHeartNote,
+    selectedMaxPrice,
+    selectedMinPrice,
     selectedTopNote,
     sortBy,
   ]);
@@ -552,6 +577,8 @@ export function CatalogClient({
     selectedTopNote !== lockedTopNote,
     selectedHeartNote !== lockedHeartNote,
     selectedBaseNote !== lockedBaseNote,
+    selectedMinPrice !== null,
+    selectedMaxPrice !== null,
     sortBy !== "featured",
   ].filter(Boolean).length;
 
@@ -597,6 +624,26 @@ export function CatalogClient({
           key: "base",
           label: toNoteLabel(selectedBaseNote),
           onClear: () => updateBaseNote(lockedBaseNote),
+        }
+      : null,
+    selectedMinPrice !== null
+      ? {
+          key: "price-min",
+          label: `>= ${selectedMinPrice} AZN`,
+          onClear: () => {
+            setSelectedMinPrice(null);
+            triggerRefresh();
+          },
+        }
+      : null,
+    selectedMaxPrice !== null
+      ? {
+          key: "price-max",
+          label: `<= ${selectedMaxPrice} AZN`,
+          onClear: () => {
+            setSelectedMaxPrice(null);
+            triggerRefresh();
+          },
         }
       : null,
     sortBy !== "featured"
