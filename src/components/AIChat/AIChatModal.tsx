@@ -344,7 +344,7 @@ function parseRichTextBlocks(text: string): RichTextBlock[] {
 
   return normalized
     .split(/\n{2,}/)
-    .map((section) => {
+    .map((section): RichTextBlock => {
       const lines = section
         .split("\n")
         .map((line) => line.trim())
@@ -352,15 +352,15 @@ function parseRichTextBlocks(text: string): RichTextBlock[] {
 
       const orderedItems = lines.map((line) => line.match(/^\d+\.\s+(.+)$/u)?.[1] ?? null);
       if (orderedItems.length > 0 && orderedItems.every(Boolean)) {
-        return { type: "ordered-list", items: orderedItems as string[] };
+        return { type: "ordered-list" as const, items: orderedItems as string[] };
       }
 
       const unorderedItems = lines.map((line) => line.match(/^[-*]\s+(.+)$/u)?.[1] ?? null);
       if (unorderedItems.length > 0 && unorderedItems.every(Boolean)) {
-        return { type: "unordered-list", items: unorderedItems as string[] };
+        return { type: "unordered-list" as const, items: unorderedItems as string[] };
       }
 
-      return { type: "paragraph", lines };
+      return { type: "paragraph" as const, lines };
     })
     .filter((block) => block.type !== "paragraph" || block.lines.length > 0);
 }
