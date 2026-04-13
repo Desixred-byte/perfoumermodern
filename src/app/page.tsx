@@ -9,6 +9,7 @@ import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary, type Locale } from "@/lib/i18n";
 import { buildAzeriPageKeywords } from "@/lib/seo";
 import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
+import type { Perfume } from "@/types/catalog";
 
 export const metadata: Metadata = {
   title: "Orijinal və Premium Ətirlər Onlayn",
@@ -275,13 +276,89 @@ const ABOUT_COPY: Record<Locale, AboutCopy> = {
   },
 };
 
+function normalizeHomeKeyPart(value: string) {
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+function homeIdentity(perfume: Perfume) {
+  return `${normalizeHomeKeyPart(perfume.name)}::${normalizeHomeKeyPart(perfume.brand)}`;
+}
+
+function getStartingPrice(perfume: Perfume) {
+  if (!perfume.sizes.length) return Number.POSITIVE_INFINITY;
+  return Math.min(...perfume.sizes.map((size) => size.price));
+}
+
+function pickHomeRepresentative(current: Perfume, incoming: Perfume) {
+  if (incoming.inStock !== current.inStock) {
+    return incoming.inStock ? incoming : current;
+  }
+
+  const currentHasSizes = current.sizes.length > 0;
+  const incomingHasSizes = incoming.sizes.length > 0;
+  if (incomingHasSizes !== currentHasSizes) {
+    return incomingHasSizes ? incoming : current;
+  }
+
+  const currentPrice = getStartingPrice(current);
+  const incomingPrice = getStartingPrice(incoming);
+  if (incomingPrice !== currentPrice) {
+    return incomingPrice < currentPrice ? incoming : current;
+  }
+
+  const currentHasImage = Boolean(current.image.trim());
+  const incomingHasImage = Boolean(incoming.image.trim());
+  if (incomingHasImage !== currentHasImage) {
+    return incomingHasImage ? incoming : current;
+  }
+
+  return current;
+}
+
+function dedupeForHomepage(perfumes: Perfume[]) {
+  const byIdentity = new Map<string, Perfume>();
+
+  for (const perfume of perfumes) {
+    const identity = homeIdentity(perfume);
+    const existing = byIdentity.get(identity);
+    if (!existing) {
+      byIdentity.set(identity, perfume);
+      continue;
+    }
+
+    byIdentity.set(identity, pickHomeRepresentative(existing, perfume));
+  }
+
+  return Array.from(byIdentity.values());
+}
+
 export default async function Home() {
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const supabaseConfig = getSupabasePublicConfigFromServer();
-  const featured = await getFeaturedPerfumes();
+  const featuredRaw = await getFeaturedPerfumes();
   const perfumes = await getPerfumes();
-  const heroProducts = perfumes.map((perfume) => ({
+  const homepagePerfumes = dedupeForHomepage(perfumes);
+  const featured = dedupeForHomepage(featuredRaw);
+
+  const featuredIdentitySet = new Set(featured.map(homeIdentity));
+  if (featured.length < 8) {
+    for (const perfume of homepagePerfumes) {
+      const identity = homeIdentity(perfume);
+      if (featuredIdentitySet.has(identity)) {
+        continue;
+      }
+
+      featured.push(perfume);
+      featuredIdentitySet.add(identity);
+
+      if (featured.length >= 8) {
+        break;
+      }
+    }
+  }
+
+  const heroProducts = homepagePerfumes.map((perfume) => ({
     slug: perfume.slug,
     name: perfume.name,
     brand: perfume.brand,

@@ -1042,6 +1042,9 @@ function scorePerfume(perfume: Perfume, message: string): number {
 }
 
 function selectRelevantPerfumes(message: string, perfumes: Perfume[]): Perfume[] {
+  const recommendationIdentity = (perfume: Perfume) =>
+    `${normalizeText(perfume.name)}::${normalizeText(perfume.brand)}`;
+
   const ranked = perfumes
     .map((perfume) => ({
       perfume,
@@ -1064,20 +1067,28 @@ function selectRelevantPerfumes(message: string, perfumes: Perfume[]): Perfume[]
   );
   const selected: typeof pool = [];
   const seenBrands = new Set<string>();
+  const seenIdentities = new Set<string>();
 
   for (const entry of rotated) {
+    const identityKey = recommendationIdentity(entry.perfume);
+    if (seenIdentities.has(identityKey)) continue;
+
     const brandKey = normalizeText(entry.perfume.brand);
     if (!seenBrands.has(brandKey)) {
       selected.push(entry);
       seenBrands.add(brandKey);
+      seenIdentities.add(identityKey);
     }
     if (selected.length >= 6) break;
   }
 
   if (selected.length < 6) {
     for (const entry of rotated) {
-      if (selected.some((item) => item.perfume.slug === entry.perfume.slug)) continue;
+      const identityKey = recommendationIdentity(entry.perfume);
+      if (seenIdentities.has(identityKey)) continue;
+
       selected.push(entry);
+      seenIdentities.add(identityKey);
       if (selected.length >= 6) break;
     }
   }

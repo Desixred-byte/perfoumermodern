@@ -63,25 +63,6 @@ const parseStockStatus = (value: string) => {
   };
 };
 
-const mergeSizes = (current: PerfumeSize[], incoming: PerfumeSize[]) => {
-  const priceByMl = new Map<number, number>();
-
-  for (const size of [...current, ...incoming]) {
-    const existing = priceByMl.get(size.ml);
-    if (existing === undefined || size.price < existing) {
-      priceByMl.set(size.ml, size.price);
-    }
-  }
-
-  return Array.from(priceByMl.entries())
-    .sort((a, b) => a[0] - b[0])
-    .map(([ml, price]) => ({
-      ml,
-      price,
-      label: `${ml}ML`,
-    }));
-};
-
 const fallbackNote = (slug: string): Note => ({
   slug,
   name: slug
@@ -124,6 +105,17 @@ const rotateBySeed = <T,>(items: T[], seed: string) => {
 };
 
 const getDailySeed = () => new Date().toISOString().slice(0, 10);
+
+const normalizeNameKey = (value: string) => value.trim().toLowerCase().replace(/\s+/g, " ");
+
+const variantIdentityKey = (perfume: Perfume) => {
+  const sizeKey = perfume.sizes
+    .map((size) => `${size.ml}:${size.price}`)
+    .sort((left, right) => left.localeCompare(right))
+    .join("|");
+
+  return [perfume.slug, sizeKey, perfume.externalLink, perfume.stockStatus.toLowerCase()].join("::");
+};
 
 async function readJsonSafely<T>(filePath: string): Promise<T | null> {
   try {
@@ -284,26 +276,37 @@ export async function getNotes(): Promise<Note[]> {
   return getNotesCached();
 }
 
-async function getPerfumesSource(): Promise<Perfume[]> {
-  const adminPerfumes = await readJsonSafely<unknown[]>(ADMIN_PERFUMES_JSON_PATH);
-  if (Array.isArray(adminPerfumes)) {
-    const parsed = adminPerfumes
-      .map(normalizePerfume)
-      .filter((item): item is Perfume => item !== null);
-
-    if (parsed.length) {
-      return parsed;
-    }
-  }
-
+async function getCsvPerfumesSource(referencePerfumes: Perfume[] = []): Promise<Perfume[]> {
   const raw = await readFile(PERFUMES_CSV_PATH, "utf-8");
   const rows = parseCsv<PerfumeCsvRow>(raw);
 
-  const bySlug = new Map<string, Perfume>();
+  const referenceImageBySlug = new Map<string, string>();
+  const referenceImageByName = new Map<string, string>();
+
+  for (const perfume of referencePerfumes) {
+    if (perfume.image.trim()) {
+      referenceImageBySlug.set(perfume.slug, perfume.image.trim());
+    }
+
+    const normalizedName = normalizeNameKey(perfume.name);
+    if (normalizedName && perfume.image.trim() && !referenceImageByName.has(normalizedName)) {
+      referenceImageByName.set(normalizedName, perfume.image.trim());
+    }
+  }
+
+  const variantCounterBySlug = new Map<string, number>();
+  const perfumes: Perfume[] = [];
 
   for (const row of rows) {
     const slug = row.slug.trim().toLowerCase();
     if (!slug) continue;
+
+    const nextVariantIndex = (variantCounterBySlug.get(slug) ?? 0) + 1;
+    variantCounterBySlug.set(slug, nextVariantIndex);
+
+    const externalLink = row.link.trim();
+    const externalId = externalLink.match(/\/(\d+)(?:\D*)$/)?.[1] ?? "";
+    const id = externalId || `${slug}__variant_${nextVariantIndex}`;
 
     const sizes = [
       { ml: 15, price: parsePrice(row.price_15ml) },
@@ -318,18 +321,24 @@ async function getPerfumesSource(): Promise<Perfume[]> {
       }));
 
     const stock = parseStockStatus(row.stock_status);
+    const normalizedName = normalizeNameKey(row.title || "");
+    const csvImage = row.image.trim();
+    const matchedImage =
+      (normalizedName ? referenceImageByName.get(normalizedName) : undefined) ||
+      referenceImageBySlug.get(slug);
+    const image = matchedImage || csvImage || getPerfumeImageUrl(slug);
 
     const parsed: Perfume = {
-      id: slug,
+      id,
       slug,
       name: row.title.trim(),
       brand: row.brand.trim(),
       gender: row.gender.trim() || "Unisex",
-      image: getPerfumeImageUrl(slug),
+      image,
       imageAlt: row.image_alt.trim(),
       stockStatus: stock.stockStatus,
       inStock: stock.inStock,
-      externalLink: row.link.trim(),
+      externalLink,
       sizes,
       noteSlugs: {
         top: splitByComma(row.top_notes || ""),
@@ -338,37 +347,43 @@ async function getPerfumesSource(): Promise<Perfume[]> {
       },
     };
 
-    const existing = bySlug.get(slug);
-    if (!existing) {
-      bySlug.set(slug, parsed);
-      continue;
-    }
-
-    bySlug.set(slug, {
-      ...existing,
-      name: existing.name || parsed.name,
-      brand: existing.brand || parsed.brand,
-      gender: existing.gender || parsed.gender,
-      image: existing.image || parsed.image,
-      imageAlt: existing.imageAlt || parsed.imageAlt,
-      stockStatus: existing.inStock ? existing.stockStatus : parsed.stockStatus,
-      inStock: existing.inStock || parsed.inStock,
-      externalLink: existing.externalLink || parsed.externalLink,
-      sizes: mergeSizes(existing.sizes, parsed.sizes),
-      noteSlugs: {
-        top: existing.noteSlugs.top.length ? existing.noteSlugs.top : parsed.noteSlugs.top,
-        heart: existing.noteSlugs.heart.length
-          ? existing.noteSlugs.heart
-          : parsed.noteSlugs.heart,
-        base: existing.noteSlugs.base.length ? existing.noteSlugs.base : parsed.noteSlugs.base,
-      },
-    });
+    perfumes.push(parsed);
   }
 
-  return Array.from(bySlug.values());
+  return perfumes;
 }
 
-const getPerfumesCached = unstable_cache(getPerfumesSource, ["catalog-perfumes-v1"], {
+async function getPerfumesSource(): Promise<Perfume[]> {
+  const adminPerfumes = await readJsonSafely<unknown[]>(ADMIN_PERFUMES_JSON_PATH);
+  let parsedAdminPerfumes: Perfume[] = [];
+
+  if (Array.isArray(adminPerfumes)) {
+    parsedAdminPerfumes = adminPerfumes
+      .map(normalizePerfume)
+      .filter((item): item is Perfume => item !== null);
+  }
+
+  const csvPerfumes = await getCsvPerfumesSource(parsedAdminPerfumes);
+
+  if (!parsedAdminPerfumes.length) {
+    return csvPerfumes;
+  }
+
+  const mergedPerfumes = [...parsedAdminPerfumes];
+  const existingVariantKeys = new Set(parsedAdminPerfumes.map(variantIdentityKey));
+
+  for (const perfume of csvPerfumes) {
+    const key = variantIdentityKey(perfume);
+    if (!existingVariantKeys.has(key)) {
+      mergedPerfumes.push(perfume);
+      existingVariantKeys.add(key);
+    }
+  }
+
+  return mergedPerfumes;
+}
+
+const getPerfumesCached = unstable_cache(getPerfumesSource, ["catalog-perfumes-v3"], {
   revalidate: 300,
   tags: ["catalog", "perfumes"],
 });

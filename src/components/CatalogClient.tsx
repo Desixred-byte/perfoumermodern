@@ -364,7 +364,7 @@ export function CatalogClient({
         if (perfume.inStock) score += 10;
 
         return {
-          id: `perfume-${perfume.slug}`,
+          id: `perfume-${perfume.id}`,
           label: perfume.name,
           type: "perfume" as const,
           value: perfume.name,

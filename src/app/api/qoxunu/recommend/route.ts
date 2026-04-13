@@ -112,6 +112,43 @@ function collectPerfumeTokens(perfume: Perfume) {
   ].map(normalize);
 }
 
+function recommendationIdentity(perfume: Perfume) {
+  return `${normalize(perfume.name)}::${normalize(perfume.brand)}`;
+}
+
+function dedupeRecommendationPerfumes(perfumes: Perfume[]) {
+  const byIdentity = new Map<string, Perfume>();
+
+  for (const perfume of perfumes) {
+    const identity = recommendationIdentity(perfume);
+    if (!byIdentity.has(identity)) {
+      byIdentity.set(identity, perfume);
+      continue;
+    }
+
+    const existing = byIdentity.get(identity);
+    if (!existing) {
+      byIdentity.set(identity, perfume);
+      continue;
+    }
+
+    const existingInStock = existing.inStock ? 1 : 0;
+    const incomingInStock = perfume.inStock ? 1 : 0;
+    if (incomingInStock > existingInStock) {
+      byIdentity.set(identity, perfume);
+      continue;
+    }
+
+    const existingPrice = getStartingPrice(existing);
+    const incomingPrice = getStartingPrice(perfume);
+    if (incomingPrice < existingPrice) {
+      byIdentity.set(identity, perfume);
+    }
+  }
+
+  return Array.from(byIdentity.values());
+}
+
 function countMatches(tokens: string[], keywords: readonly string[]) {
   let score = 0;
   for (const keyword of keywords) {
@@ -248,7 +285,7 @@ export async function POST(request: Request) {
   const answers = body.answers ?? {};
   const freeText = (body.freeText ?? "").trim();
 
-  const perfumes = await getPerfumes();
+  const perfumes = dedupeRecommendationPerfumes(await getPerfumes());
   const candidates = [...perfumes]
     .map((perfume) => ({ perfume, score: scorePerfume(perfume, answers) }))
     .sort((a, b) => b.score - a.score)

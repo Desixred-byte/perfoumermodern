@@ -27,7 +27,7 @@ type PerfumeDetailPageProps = {
 
 export async function generateStaticParams() {
   const perfumes = await getPerfumes();
-  return perfumes.map((perfume) => ({ slug: perfume.slug }));
+  return Array.from(new Set(perfumes.map((perfume) => perfume.slug))).map((slug) => ({ slug }));
 }
 
 export async function generateMetadata({
