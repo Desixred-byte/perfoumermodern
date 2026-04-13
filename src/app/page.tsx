@@ -332,14 +332,21 @@ function dedupeForHomepage(perfumes: Perfume[]) {
   return Array.from(byIdentity.values());
 }
 
+function isHomepageEligible(perfume: Perfume) {
+  if (!perfume.inStock) return false;
+  if (!perfume.sizes.length) return false;
+
+  return perfume.sizes.some((size) => Number.isFinite(size.price) && size.price > 0);
+}
+
 export default async function Home() {
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const supabaseConfig = getSupabasePublicConfigFromServer();
   const featuredRaw = await getFeaturedPerfumes();
   const perfumes = await getPerfumes();
-  const homepagePerfumes = dedupeForHomepage(perfumes);
-  const featured = dedupeForHomepage(featuredRaw);
+  const homepagePerfumes = dedupeForHomepage(perfumes.filter(isHomepageEligible));
+  const featured = dedupeForHomepage(featuredRaw.filter(isHomepageEligible));
 
   const featuredIdentitySet = new Set(featured.map(homeIdentity));
   if (featured.length < 8) {
