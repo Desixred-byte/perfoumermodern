@@ -481,11 +481,13 @@ function getResultTags(dictionary: QuizDictionary, answers: QuizAnswers) {
 }
 
 export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume[]; notes: Note[]; locale: Locale }) {
+  const NOTES_PER_PAGE = 24;
   const dictionary = QUIZ_DICTIONARY[locale];
   const [answers, setAnswers] = useState<QuizAnswers>(INITIAL_ANSWERS);
   const [notePreferences, setNotePreferences] = useState<Record<string, "like" | "dislike">>({});
   const [extraAiNotes, setExtraAiNotes] = useState("");
   const [notesQuery, setNotesQuery] = useState("");
+  const [notesPage, setNotesPage] = useState(1);
   const [stepIndex, setStepIndex] = useState(0);
   const [questionCardHeight, setQuestionCardHeight] = useState<number | null>(null);
   const [aiMatches, setAiMatches] = useState<Perfume[] | null>(null);
@@ -570,6 +572,28 @@ export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume
   const noteBySlug = useMemo(() => {
     return new Map(notes.map((note) => [note.slug, note]));
   }, [notes]);
+
+  const normalizedNotesQuery = useMemo(() => normalize(notesQuery), [notesQuery]);
+
+  const filteredNotes = useMemo(
+    () =>
+      notes.filter((note) => {
+        if (!normalizedNotesQuery) return true;
+        return (
+          normalize(localizeNoteLabel(note, locale)).includes(normalizedNotesQuery) ||
+          note.slug.includes(normalizedNotesQuery)
+        );
+      }),
+    [locale, normalizedNotesQuery, notes],
+  );
+
+  const totalNotePages = Math.max(1, Math.ceil(filteredNotes.length / NOTES_PER_PAGE));
+  const currentNotesPage = Math.min(notesPage, totalNotePages);
+
+  const visibleNotes = useMemo(() => {
+    const start = (currentNotesPage - 1) * NOTES_PER_PAGE;
+    return filteredNotes.slice(start, start + NOTES_PER_PAGE);
+  }, [currentNotesPage, filteredNotes]);
 
   const notesLine = likedNotes.length
     ? likedNotes
@@ -739,6 +763,16 @@ export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume
     }
   }, [isMobileLayout]);
 
+  useEffect(() => {
+    setNotesPage(1);
+  }, [normalizedNotesQuery]);
+
+  useEffect(() => {
+    if (notesPage > totalNotePages) {
+      setNotesPage(totalNotePages);
+    }
+  }, [notesPage, totalNotePages]);
+
   useLayoutEffect(() => {
     if (isComplete || !questionCardRef.current || !questionCardInnerRef.current) return;
 
@@ -894,15 +928,25 @@ export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume
                     placeholder={locale === "az" ? "Not axtar..." : locale === "ru" ? "Поиск нот..." : "Search notes..."}
                     className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 outline-none"
                   />
-                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                    {notes
-                      .filter((note) => {
-                        const term = normalize(notesQuery);
-                        if (!term) return true;
-                        return normalize(localizeNoteLabel(note, locale)).includes(term) || note.slug.includes(term);
-                      })
-                      .slice(0, 120)
-                      .map((note) => {
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[0.7rem] font-medium text-zinc-500 sm:text-xs">
+                    <span>
+                      {locale === "az"
+                        ? `${filteredNotes.length} not tapıldı`
+                        : locale === "ru"
+                          ? `Найдено: ${filteredNotes.length}`
+                          : `${filteredNotes.length} notes found`}
+                    </span>
+                    <span>
+                      {locale === "az"
+                        ? `Səhifə ${currentNotesPage}/${totalNotePages}`
+                        : locale === "ru"
+                          ? `Страница ${currentNotesPage}/${totalNotePages}`
+                          : `Page ${currentNotesPage}/${totalNotePages}`}
+                    </span>
+                  </div>
+
+                  <div key={`${currentNotesPage}-${normalizedNotesQuery}`} className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {visibleNotes.map((note, index) => {
                         const state = notePreferences[note.slug];
                         return (
                           <button
@@ -925,13 +969,14 @@ export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume
                               });
                             }}
                             className={[
-                              "group rounded-xl border bg-white p-1.5 text-left transition-all duration-300",
+                              "qoxunu-note-reveal group rounded-xl border bg-white p-1.5 text-left transition-all duration-300",
                               state === "like"
                                 ? "border-emerald-400 bg-emerald-50/65"
                                 : state === "dislike"
                                   ? "border-rose-400 bg-rose-50/65"
-                                  : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50",
+                                  : "border-zinc-200 hover:-translate-y-[1px] hover:border-zinc-300 hover:bg-zinc-50",
                             ].join(" ")}
+                            style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
                           >
                             <div className="flex items-center gap-2 rounded-[0.7rem]">
                               <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[0.65rem] bg-zinc-100">
@@ -975,6 +1020,65 @@ export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume
                         );
                       })}
                   </div>
+
+                  {filteredNotes.length === 0 ? (
+                    <p className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-500">
+                      {locale === "az"
+                        ? "Bu axtarışa uyğun not tapılmadı."
+                        : locale === "ru"
+                          ? "По вашему запросу ноты не найдены."
+                          : "No notes match this search."}
+                    </p>
+                  ) : null}
+
+                  {totalNotePages > 1 ? (
+                    <div className="mt-3 flex items-center justify-between gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNotesPage((page) => Math.max(1, page - 1))}
+                        disabled={currentNotesPage <= 1}
+                        className="inline-flex min-h-9 items-center justify-center rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 text-xs font-semibold text-zinc-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {locale === "az" ? "Əvvəlki" : locale === "ru" ? "Назад" : "Previous"}
+                      </button>
+
+                      <div className="flex items-center gap-1.5">
+                        {Array.from({ length: Math.min(totalNotePages, 5) }, (_, idx) => {
+                          const start = Math.min(
+                            Math.max(1, currentNotesPage - 2),
+                            Math.max(1, totalNotePages - 4),
+                          );
+                          const page = start + idx;
+                          const active = page === currentNotesPage;
+
+                          return (
+                            <button
+                              key={page}
+                              type="button"
+                              onClick={() => setNotesPage(page)}
+                              className={[
+                                "inline-flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold transition",
+                                active
+                                  ? "border-zinc-900 bg-zinc-900 text-white"
+                                  : "border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50",
+                              ].join(" ")}
+                            >
+                              {page}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setNotesPage((page) => Math.min(totalNotePages, page + 1))}
+                        disabled={currentNotesPage >= totalNotePages}
+                        className="inline-flex min-h-9 items-center justify-center rounded-full border border-zinc-300 bg-[#f6f5f2] px-3 text-xs font-semibold text-zinc-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {locale === "az" ? "Növbəti" : locale === "ru" ? "Далее" : "Next"}
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/90 p-3">

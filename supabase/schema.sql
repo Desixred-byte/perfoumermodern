@@ -476,6 +476,11 @@ create table if not exists public.website_live_sessions (
   os text not null default '',
   browser text not null default '',
   locale text not null default 'az',
+  timezone text not null default '',
+  country_code text not null default '',
+  country text not null default '',
+  region text not null default '',
+  city text not null default '',
   path text not null default '/',
   referrer text not null default '',
   first_seen timestamptz not null default timezone('utc', now()),
@@ -495,10 +500,29 @@ create table if not exists public.website_analytics_events (
   os text not null default '',
   browser text not null default '',
   locale text not null default 'az',
+  timezone text not null default '',
+  country_code text not null default '',
+  country text not null default '',
+  region text not null default '',
+  city text not null default '',
   path text not null default '/',
   referrer text not null default '',
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.website_live_sessions
+  add column if not exists timezone text not null default '',
+  add column if not exists country_code text not null default '',
+  add column if not exists country text not null default '',
+  add column if not exists region text not null default '',
+  add column if not exists city text not null default '';
+
+alter table public.website_analytics_events
+  add column if not exists timezone text not null default '',
+  add column if not exists country_code text not null default '',
+  add column if not exists country text not null default '',
+  add column if not exists region text not null default '',
+  add column if not exists city text not null default '';
 
 create index if not exists website_live_sessions_last_seen_idx
   on public.website_live_sessions (last_seen desc);
@@ -508,6 +532,12 @@ create index if not exists website_live_sessions_user_idx
 
 create index if not exists website_live_sessions_anonymous_idx
   on public.website_live_sessions (anonymous_id);
+
+create index if not exists website_live_sessions_country_idx
+  on public.website_live_sessions (country);
+
+create index if not exists website_live_sessions_city_idx
+  on public.website_live_sessions (city);
 
 create index if not exists website_analytics_events_created_idx
   on public.website_analytics_events (created_at desc);
@@ -520,6 +550,9 @@ create index if not exists website_analytics_events_anonymous_idx
 
 create index if not exists website_analytics_events_path_idx
   on public.website_analytics_events (path);
+
+create index if not exists website_analytics_events_country_idx
+  on public.website_analytics_events (country);
 
 drop trigger if exists set_website_live_sessions_updated_at on public.website_live_sessions;
 create trigger set_website_live_sessions_updated_at

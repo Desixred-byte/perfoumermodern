@@ -52,7 +52,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Perfoumer sifarişinizdən razı qalmağınızı istəyir. Bu səhifə hansı məhsulların qaytarıla bildiyini, müraciətin necə edildiyini və geri ödəniş prosesinin necə işlədiyini aydın şəkildə izah edir.",
       updatedLabel: "Son yenilənmə",
-      updatedValue: "11 aprel 2026",
+      updatedValue: "13 aprel 2026",
       navigationTitle: "Hüquqi səhifələr",
       contactTitle: "Qaytarılma ilə bağlı dəstək",
       contactText:
@@ -153,7 +153,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Bu şərtlər Perfoumer.az saytından istifadəni, məhsul sifarişini və hesab funksiyalarından yararlanma qaydalarını tənzimləyir. Saytdan istifadə etməklə aşağıdakı şərtlərlə razılaşmış olursunuz.",
       updatedLabel: "Son yenilənmə",
-      updatedValue: "11 aprel 2026",
+      updatedValue: "13 aprel 2026",
       navigationTitle: "Hüquqi səhifələr",
       contactTitle: "Şərtlərlə bağlı sualınız var?",
       contactText:
@@ -222,6 +222,17 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           ],
         },
         {
+          title: "Xidmət monitorinqi və analitika",
+          paragraphs: [
+            "Saytın sabitliyi, təhlükəsizliyi və performansının izlənməsi üçün məhdud texniki analitika qeydləri aparıla bilər. Bu qeydlər daxili statistika və xidmət keyfiyyətinin artırılması məqsədilə aqreqasiya edilə bilər.",
+          ],
+          bullets: [
+            "Sessiya, cihaz, səhifə baxışı və istinad mənbəyi kimi texniki məlumatlar emal oluna bilər.",
+            "IP əsaslı təxmini geolokasiya (ölkə, region, şəhər, vaxt zonası) təhlükəsizlik və monitorinq məqsədi ilə istifadə oluna bilər.",
+            "Bu emal üzrə ətraflı qaydalar Məxfilik siyasətində göstərilir.",
+          ],
+        },
+        {
           title: "Əqli mülkiyyət və məsuliyyət çərçivəsi",
           paragraphs: [
             "Saytdakı dizayn, mətn, vizual, loqo və proqram hissələri Perfoumer və ya müvafiq hüquq sahiblərinə məxsusdur. Sayt qanunla icazə verilməyən formada köçürülə, yayıla və ya kommersiya məqsədi ilə istifadə edilə bilməz.",
@@ -254,7 +265,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Perfoumer şəxsi məlumatların toplanması və istifadəsi mövzusunda şəffaf olmağa çalışır. Bu siyasət sayt ziyarətləri, sifarişlər və hesab funksiyalarından istifadə zamanı məlumatların necə idarə olunduğunu açıqlayır.",
       updatedLabel: "Son yenilənmə",
-      updatedValue: "11 aprel 2026",
+      updatedValue: "13 aprel 2026",
       navigationTitle: "Hüquqi səhifələr",
       contactTitle: "Məxfiliklə bağlı sorğular",
       contactText:
@@ -303,11 +314,26 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           title: "Cookies və analitika",
           paragraphs: [
             "Saytın sabit işləməsi və performansın ölçülməsi üçün cookies və bənzər texnologiyalardan istifadə oluna bilər. Bu texnologiyalar sessiyanın saxlanması, üstünlüklərin xatırlanması və ümumi istifadə meyllərinin anlaşılmasına kömək edir.",
+            "Statistika paneli üçün sessiya texniki məlumatları (sessiya identifikatoru, anonim identifikator, cihaz növü, brauzer, əməliyyat sistemi, baxılan səhifə, istinad mənbəyi və vaxt) emal oluna bilər.",
           ],
           bullets: [
             "Əsas funksiyalar üçün zəruri cookies.",
             "Dil seçimi və bəzi rahatlıq seçimlərini yadda saxlayan cookies.",
             "Ümumi davranış analizi üçün anonim və ya məhdud analitika məlumatı.",
+            "IP əsaslı təxmini geolokasiya məlumatı (ölkə, region, şəhər, vaxt zonası) xidmət monitorinqi və təhlükəsizlik məqsədi ilə istifadə oluna bilər.",
+            "Dəqiq GPS geolokasiyası toplamırıq.",
+          ],
+        },
+        {
+          title: "Analitika məqsədi, hüquqi əsas və istifadəçi nəzarəti",
+          paragraphs: [
+            "Analitika məlumatları saytın performansını, təhlükəsizliyini və xidmət keyfiyyətini ölçmək üçün istifadə olunur. Toplanmış məlumatlar daxili statistika (məsələn, aktiv səhifələr, cihaz bölgüsü, ölkələr üzrə ziyarətçi sayı) şəklində aqreqasiya edilə bilər.",
+            "Məlumat emalı tətbiq olunan qanunvericiliyə uyğun olaraq müqavilə öhdəliyinin icrası, qanuni maraq və zəruri hallarda razılıq kimi hüquqi əsaslara söykənə bilər.",
+          ],
+          bullets: [
+            "Analitika məlumatı reklam məqsədli üçüncü tərəf satışına yönəldilmir.",
+            "Müraciət etdikdə məlumatlarınız barədə izah, düzəliş və uyğun hallarda silinmə tələbi verə bilərsiniz.",
+            "Qanuni öhdəliklər və təhlükəsizlik auditləri səbəbilə bəzi qeydlər müəyyən müddət saxlanıla bilər.",
           ],
         },
         {
@@ -357,7 +383,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "We want every Perfoumer order to arrive exactly as expected. This page explains which items may be returned, how the request is reviewed, and what to expect during the refund process.",
       updatedLabel: "Last updated",
-      updatedValue: "April 11, 2026",
+      updatedValue: "April 13, 2026",
       navigationTitle: "Legal pages",
       contactTitle: "Need help with a return?",
       contactText:
@@ -443,7 +469,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "These terms explain how Perfoumer.az may be used, how orders are handled, and what rules apply when customers interact with accounts, content, and purchasing features on the site.",
       updatedLabel: "Last updated",
-      updatedValue: "April 11, 2026",
+      updatedValue: "April 13, 2026",
       navigationTitle: "Legal pages",
       contactTitle: "Questions about the terms?",
       contactText:
@@ -509,6 +535,17 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           ],
         },
         {
+          title: "Service monitoring and analytics",
+          paragraphs: [
+            "To keep the platform stable and secure, we may process limited technical analytics records and produce aggregated internal metrics used for service quality improvements.",
+          ],
+          bullets: [
+            "Technical records may include session, device, path, timing, and referrer data.",
+            "Approximate IP-based location metadata (country, region, city, timezone) may be used for security and operations monitoring.",
+            "Detailed data-processing rules are described in the Privacy Policy.",
+          ],
+        },
+        {
           title: "Intellectual property and liability",
           paragraphs: [
             "Website copy, design, logos, photography, and software components belong to Perfoumer or the relevant rights holders and may not be reused beyond what the law permits.",
@@ -525,7 +562,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Perfoumer aims to be clear about the personal information collected through site visits, orders, and account features. This policy explains how that information is handled and protected.",
       updatedLabel: "Last updated",
-      updatedValue: "April 11, 2026",
+      updatedValue: "April 13, 2026",
       navigationTitle: "Legal pages",
       contactTitle: "Privacy questions",
       contactText:
@@ -572,11 +609,26 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           title: "Cookies and analytics",
           paragraphs: [
             "Cookies and similar tools may be used to keep sessions active, remember preferences, and understand general site usage. These tools help us maintain continuity and improve the customer experience.",
+            "To operate live analytics, we may process technical session data such as session identifiers, anonymous identifiers, device type, browser, operating system, visited path, referrer, and timing information.",
           ],
           bullets: [
             "Essential cookies needed for site functionality.",
             "Preference cookies such as selected language or convenience settings.",
             "Anonymous or limited analytics to understand performance trends.",
+            "Approximate IP-based geolocation (country, region, city, timezone) may be used for security and service monitoring.",
+            "We do not collect precise GPS location from your device.",
+          ],
+        },
+        {
+          title: "Analytics purpose and legal basis",
+          paragraphs: [
+            "Analytics data is used to measure platform performance, detect abuse, and improve service quality. We may display aggregated internal statistics such as active paths, device split, and top countries by visitors.",
+            "Processing is based on applicable legal grounds, including contract performance, legitimate interest, and consent where required by law.",
+          ],
+          bullets: [
+            "We do not sell analytics personal data to advertising data brokers.",
+            "You may request access, correction, or deletion where applicable and legally permitted.",
+            "Some records may be retained for security, fraud prevention, and legal compliance periods.",
           ],
         },
         {
@@ -613,7 +665,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Мы хотим, чтобы заказ Perfoumer соответствовал ожиданиям. На этой странице описано, какие товары можно вернуть, как проходит проверка заявки и как работает возврат средств.",
       updatedLabel: "Последнее обновление",
-      updatedValue: "11 апреля 2026",
+      updatedValue: "13 апреля 2026",
       navigationTitle: "Юридические страницы",
       contactTitle: "Нужна помощь с возвратом?",
       contactText:
@@ -699,7 +751,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Эти условия регулируют использование сайта Perfoumer.az, оформление заказов и правила работы с аккаунтом, комментариями и пользовательскими функциями.",
       updatedLabel: "Последнее обновление",
-      updatedValue: "11 апреля 2026",
+      updatedValue: "13 апреля 2026",
       navigationTitle: "Юридические страницы",
       contactTitle: "Есть вопрос по условиям?",
       contactText:
@@ -765,6 +817,17 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           ],
         },
         {
+          title: "Мониторинг сервиса и аналитика",
+          paragraphs: [
+            "Для поддержания стабильности и безопасности платформы мы можем обрабатывать ограниченные технические аналитические записи и формировать агрегированную внутреннюю статистику для улучшения качества сервиса.",
+          ],
+          bullets: [
+            "Технические записи могут включать данные сессии, устройства, пути страницы, времени и referrer.",
+            "Приблизительная IP-геолокация (страна, регион, город, часовой пояс) может использоваться для безопасности и операционного мониторинга.",
+            "Подробные правила обработки указаны в Политике конфиденциальности.",
+          ],
+        },
+        {
           title: "Интеллектуальная собственность и ответственность",
           paragraphs: [
             "Дизайн, тексты, изображения, логотипы и программные элементы сайта принадлежат Perfoumer или соответствующим правообладателям и не могут использоваться вне рамок закона.",
@@ -781,7 +844,7 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
       description:
         "Perfoumer стремится прозрачно объяснять, какие персональные данные собираются при посещении сайта, оформлении заказов и использовании аккаунта, а также как эти данные защищаются.",
       updatedLabel: "Последнее обновление",
-      updatedValue: "11 апреля 2026",
+      updatedValue: "13 апреля 2026",
       navigationTitle: "Юридические страницы",
       contactTitle: "Вопросы по конфиденциальности",
       contactText:
@@ -828,11 +891,26 @@ const legalPages: Record<Locale, Record<LegalPageSlug, LegalPageContent>> = {
           title: "Cookies и аналитика",
           paragraphs: [
             "Для сохранения сессии, предпочтений и общего понимания работы сайта могут использоваться cookies и похожие технологии. Это помогает поддерживать непрерывный и удобный пользовательский опыт.",
+            "Для live-статистики могут обрабатываться технические данные сессии: идентификатор сессии, анонимный идентификатор, тип устройства, браузер, ОС, путь страницы, referrer и время события.",
           ],
           bullets: [
             "Необходимые cookies для базовой работы сайта.",
             "Cookies предпочтений, включая выбранный язык и удобство использования.",
             "Ограниченная аналитика для понимания общих показателей работы.",
+            "Для мониторинга сервиса и безопасности может использоваться приблизительная IP-геолокация (страна, регион, город, часовой пояс).",
+            "Точная GPS-геолокация устройства не собирается.",
+          ],
+        },
+        {
+          title: "Цель аналитики и правовые основания",
+          paragraphs: [
+            "Аналитические данные используются для контроля производительности, обнаружения злоупотреблений и улучшения качества сервиса. Внутренние отчеты могут формироваться в агрегированном виде (например, активные страницы, устройства, топ стран по посетителям).",
+            "Обработка выполняется на применимых правовых основаниях: исполнение договора, законный интерес и, где требуется, согласие пользователя.",
+          ],
+          bullets: [
+            "Мы не продаем персональные аналитические данные рекламным брокерам.",
+            "Вы можете запросить доступ, исправление или удаление данных в применимых случаях.",
+            "Часть журналов может храниться в течение сроков, необходимых для безопасности, антифрода и соблюдения закона.",
           ],
         },
         {

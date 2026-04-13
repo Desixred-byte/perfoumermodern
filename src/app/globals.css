@@ -1219,6 +1219,23 @@ h6 {
   animation: quizOptionReveal 460ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+@keyframes qoxunuNoteReveal {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+    filter: blur(0.8px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.qoxunu-note-reveal {
+  animation: qoxunuNoteReveal 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @keyframes quizResultsEnter {
   0% {
     opacity: 0;
@@ -1689,6 +1706,10 @@ h6 {
   }
 
   .quiz-option-reveal {
+    animation: none;
+  }
+
+  .qoxunu-note-reveal {
     animation: none;
   }
 

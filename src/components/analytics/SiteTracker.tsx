@@ -77,6 +77,7 @@ export function SiteTracker() {
         userId: user?.id ?? null,
         isLoggedIn: Boolean(user),
         locale: document.documentElement.lang || "az",
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "",
         path: fullPath,
         referrer: document.referrer || "",
         deviceType: detectDeviceType(userAgent),

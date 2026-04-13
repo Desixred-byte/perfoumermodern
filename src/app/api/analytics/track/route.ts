@@ -14,6 +14,11 @@ type TrackPayload = {
   locale?: string;
   path?: string;
   referrer?: string;
+  timezone?: string;
+  countryCode?: string;
+  country?: string;
+  region?: string;
+  city?: string;
 };
 
 function sanitizeText(value: unknown, fallback: string, maxLength = 120): string {
@@ -25,6 +30,16 @@ function sanitizeText(value: unknown, fallback: string, maxLength = 120): string
 
 function toBool(value: unknown): boolean {
   return value === true;
+}
+
+function readHeader(headers: Headers, keys: string[]): string {
+  for (const key of keys) {
+    const value = headers.get(key);
+    if (value && value.trim()) {
+      return value.trim();
+    }
+  }
+  return "";
 }
 
 export async function POST(request: Request) {
@@ -54,6 +69,26 @@ export async function POST(request: Request) {
     supabaseServiceRoleKey || supabaseAnonKey || "",
   );
 
+  const countryCodeFromHeaders = readHeader(request.headers, [
+    "x-vercel-ip-country",
+    "cf-ipcountry",
+    "x-country-code",
+  ]).toUpperCase();
+  const countryFromHeaders = readHeader(request.headers, [
+    "x-vercel-ip-country-name",
+    "cf-country-name",
+  ]);
+  const regionFromHeaders = readHeader(request.headers, [
+    "x-vercel-ip-country-region",
+    "x-vercel-ip-region",
+    "cf-region",
+  ]);
+  const cityFromHeaders = readHeader(request.headers, [
+    "x-vercel-ip-city",
+    "cf-ipcity",
+    "x-city",
+  ]);
+
   const payload = {
     session_id: sessionId,
     anonymous_id: anonymousId,
@@ -65,6 +100,11 @@ export async function POST(request: Request) {
     locale: sanitizeText(body.locale, "az", 10),
     path: sanitizeText(body.path, "/", 180),
     referrer: sanitizeText(body.referrer, "", 500),
+    timezone: sanitizeText(body.timezone, "", 64),
+    country_code: sanitizeText(body.countryCode || countryCodeFromHeaders, "", 4).toUpperCase(),
+    country: sanitizeText(body.country || countryFromHeaders, "", 120),
+    region: sanitizeText(body.region || regionFromHeaders, "", 120),
+    city: sanitizeText(body.city || cityFromHeaders, "", 120),
   };
 
   const { data: existing } = await supabase
@@ -86,6 +126,11 @@ export async function POST(request: Request) {
         locale: payload.locale,
         path: payload.path,
         referrer: payload.referrer,
+        timezone: payload.timezone,
+        country_code: payload.country_code,
+        country: payload.country,
+        region: payload.region,
+        city: payload.city,
         last_seen: new Date().toISOString(),
         page_views: Number(existing.page_views ?? 0) + 1,
       })

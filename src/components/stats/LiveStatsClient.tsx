@@ -19,6 +19,9 @@ type StatsPayload = {
     totalEvents: number;
     totalPageViews: number;
   };
+  topCountries: Array<{ country: string; visitors: number }>;
+  liveCountries: Array<{ country: string; count: number }>;
+  deviceLocationBreakdown: Array<{ deviceType: string; country: string; city: string; count: number }>;
   currentDeviceBreakdown: Record<string, number>;
   currentTopPaths: Array<{ path: string; count: number }>;
   currentUsers: Array<{
@@ -29,6 +32,11 @@ type StatsPayload = {
     deviceType: string;
     browser: string;
     os: string;
+    countryCode: string;
+    country: string;
+    region: string;
+    city: string;
+    timezone: string;
     path: string;
     lastSeen: string;
   }>;
@@ -146,6 +154,66 @@ export function LiveStatsClient() {
         </div>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <div className="rounded-2xl border border-zinc-200 bg-white/90 p-4">
+          <h2 className="text-lg font-semibold tracking-[-0.015em] text-zinc-900">Top countries by visitors</h2>
+          <div className="mt-3 space-y-2 text-sm">
+            {(stats?.topCountries || []).length ? (
+              stats?.topCountries.map((row) => (
+                <div key={`${row.country}:${row.visitors}`} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                  <span className="truncate text-zinc-700">{row.country}</span>
+                  <span className="ml-3 font-medium text-zinc-900">{row.visitors}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-zinc-500">No country data yet.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-zinc-200 bg-white/90 p-4">
+          <h2 className="text-lg font-semibold tracking-[-0.015em] text-zinc-900">Current online by country</h2>
+          <div className="mt-3 space-y-2 text-sm">
+            {(stats?.liveCountries || []).length ? (
+              stats?.liveCountries.map((row) => (
+                <div key={`${row.country}:${row.count}`} className="flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
+                  <span className="truncate text-zinc-700">{row.country}</span>
+                  <span className="ml-3 font-medium text-zinc-900">{row.count}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-zinc-500">No live country data yet.</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white/90 p-4">
+        <h2 className="text-lg font-semibold tracking-[-0.015em] text-zinc-900">Device + location breakdown (live)</h2>
+        <div className="mt-3 overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-zinc-200 text-left text-zinc-500">
+                <th className="px-2 py-2 font-medium">Device</th>
+                <th className="px-2 py-2 font-medium">Country</th>
+                <th className="px-2 py-2 font-medium">City</th>
+                <th className="px-2 py-2 font-medium">Users</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(stats?.deviceLocationBreakdown || []).map((row) => (
+                <tr key={`${row.deviceType}:${row.country}:${row.city}:${row.count}`} className="border-b border-zinc-100 text-zinc-700">
+                  <td className="px-2 py-2 capitalize">{row.deviceType}</td>
+                  <td className="px-2 py-2">{row.country}</td>
+                  <td className="px-2 py-2">{row.city}</td>
+                  <td className="px-2 py-2 font-medium text-zinc-900">{row.count}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-zinc-200 bg-white/90 p-4">
         <h2 className="text-lg font-semibold tracking-[-0.015em] text-zinc-900">Current visitors</h2>
         <div className="mt-3 overflow-x-auto">
@@ -155,8 +223,12 @@ export function LiveStatsClient() {
                 <th className="px-2 py-2 font-medium">Type</th>
                 <th className="px-2 py-2 font-medium">Path</th>
                 <th className="px-2 py-2 font-medium">Device</th>
+                <th className="px-2 py-2 font-medium">Country</th>
+                <th className="px-2 py-2 font-medium">Region</th>
+                <th className="px-2 py-2 font-medium">City</th>
                 <th className="px-2 py-2 font-medium">Browser</th>
                 <th className="px-2 py-2 font-medium">OS</th>
+                <th className="px-2 py-2 font-medium">Timezone</th>
                 <th className="px-2 py-2 font-medium">Last seen</th>
               </tr>
             </thead>
@@ -172,8 +244,12 @@ export function LiveStatsClient() {
                   </td>
                   <td className="max-w-[24rem] truncate px-2 py-2">{row.path}</td>
                   <td className="px-2 py-2 capitalize">{row.deviceType}</td>
+                  <td className="px-2 py-2">{row.country || row.countryCode || "-"}</td>
+                  <td className="px-2 py-2">{row.region || "-"}</td>
+                  <td className="px-2 py-2">{row.city || "-"}</td>
                   <td className="px-2 py-2">{row.browser}</td>
                   <td className="px-2 py-2">{row.os}</td>
+                  <td className="px-2 py-2">{row.timezone || "-"}</td>
                   <td className="px-2 py-2">{new Date(row.lastSeen).toLocaleTimeString()}</td>
                 </tr>
               ))}

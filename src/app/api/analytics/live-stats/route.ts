@@ -11,6 +11,15 @@ function groupCount(values: string[]) {
   }, {});
 }
 
+function normalizeCountryLabel(country: unknown, countryCode: unknown): string {
+  const direct = String(country || "").trim();
+  if (direct) return direct;
+
+  const code = String(countryCode || "").trim().toUpperCase();
+  if (!code) return "Unknown";
+  return code;
+}
+
 export async function GET() {
   const configured = isAdminConfigured();
   const authenticated = configured ? await isAdminAuthenticated() : false;
@@ -34,7 +43,7 @@ export async function GET() {
   const [{ data: sessions }, { count: totalEvents }] = await Promise.all([
     supabase
       .from("website_live_sessions")
-      .select("session_id,anonymous_id,user_id,is_logged_in,device_type,browser,os,path,last_seen,first_seen,page_views"),
+      .select("session_id,anonymous_id,user_id,is_logged_in,device_type,browser,os,path,last_seen,first_seen,page_views,country_code,country,region,city,timezone"),
     supabase
       .from("website_analytics_events")
       .select("id", { count: "exact", head: true }),
@@ -82,6 +91,50 @@ export async function GET() {
     .slice(0, 8)
     .map(([path, count]) => ({ path, count }));
 
+  const visitorsPerCountry = new Map<string, Set<string>>();
+  for (const row of rows) {
+    const countryLabel = normalizeCountryLabel((row as { country?: unknown }).country, (row as { country_code?: unknown }).country_code);
+    const anon = String(row.anonymous_id || "").trim();
+    if (!anon) continue;
+
+    const existing = visitorsPerCountry.get(countryLabel) || new Set<string>();
+    existing.add(anon);
+    visitorsPerCountry.set(countryLabel, existing);
+  }
+
+  const topCountries = Array.from(visitorsPerCountry.entries())
+    .map(([country, ids]) => ({ country, visitors: ids.size }))
+    .sort((a, b) => b.visitors - a.visitors)
+    .slice(0, 12);
+
+  const liveCountries = Object.entries(
+    groupCount(
+      currentRows.map((row) =>
+        normalizeCountryLabel((row as { country?: unknown }).country, (row as { country_code?: unknown }).country_code),
+      ),
+    ),
+  )
+    .map(([country, count]) => ({ country, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 12);
+
+  const deviceLocationBreakdown = Object.entries(
+    groupCount(
+      currentRows.map((row) => {
+        const countryLabel = normalizeCountryLabel((row as { country?: unknown }).country, (row as { country_code?: unknown }).country_code);
+        const cityLabel = String((row as { city?: unknown }).city || "").trim() || "-";
+        const device = String(row.device_type || "unknown");
+        return `${device}|||${countryLabel}|||${cityLabel}`;
+      }),
+    ),
+  )
+    .map(([composite, count]) => {
+      const [deviceType, country, city] = composite.split("|||");
+      return { deviceType, country, city, count };
+    })
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 30);
+
   return NextResponse.json(
     {
       generatedAt: new Date().toISOString(),
@@ -100,6 +153,9 @@ export async function GET() {
         totalEvents: totalEvents ?? 0,
         totalPageViews: rows.reduce((sum, row) => sum + Number(row.page_views || 0), 0),
       },
+      topCountries,
+      liveCountries,
+      deviceLocationBreakdown,
       currentDeviceBreakdown: deviceBreakdownCurrent,
       currentTopPaths: topPathsCurrent,
       currentUsers: currentRows.slice(0, 120).map((row) => ({
@@ -110,6 +166,11 @@ export async function GET() {
         deviceType: row.device_type,
         browser: row.browser,
         os: row.os,
+        countryCode: (row as { country_code?: string }).country_code || "",
+        country: (row as { country?: string }).country || "",
+        region: (row as { region?: string }).region || "",
+        city: (row as { city?: string }).city || "",
+        timezone: (row as { timezone?: string }).timezone || "",
         path: row.path,
         lastSeen: row.last_seen,
       })),
