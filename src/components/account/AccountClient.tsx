@@ -1559,7 +1559,7 @@ export function AccountClient({ locale, supabase: supabaseConfig, focusSection =
       </section> : null}
 
       {showAddressesSection ? <AccountAddressesClient locale={locale} supabase={supabaseConfig} /> : null}
-      {showOrdersSection ? <AccountOrdersClient locale={locale} /> : null}
+      {showOrdersSection ? <AccountOrdersClient locale={locale} supabase={supabaseConfig} /> : null}
 
       <section className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <button

@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useSupabaseClient, useUser } from "@supabase/auth-helpers-react";
 import type { Locale } from "@/lib/i18n";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import type { SupabasePublicConfig } from "@/lib/supabase/client";
 
 type OrderItem = {
   perfume_slug: string;
@@ -29,14 +30,15 @@ type Order = {
 
 type AccountOrdersClientProps = {
   locale: Locale;
+  supabase: SupabasePublicConfig | null;
 };
 
-export function AccountOrdersClient({ locale }: AccountOrdersClientProps) {
-  const user = useUser();
-  const supabase = useSupabaseClient();
+export function AccountOrdersClient({ locale, supabase: supabaseConfig }: AccountOrdersClientProps) {
+  const supabase = getSupabaseBrowserClient(supabaseConfig ?? undefined);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const copy =
     locale === "az"
@@ -118,13 +120,17 @@ export function AccountOrdersClient({ locale }: AccountOrdersClientProps) {
           };
 
   useEffect(() => {
-    async function fetchOrders() {
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
+    async function fetchData() {
       try {
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+          setLoading(false);
+          return;
+        }
+
+        setUserId(user.id);
+
         const { data: sessionData } = await supabase.auth.getSession();
         if (!sessionData.session?.access_token) {
           setError("Not authenticated");
@@ -152,8 +158,8 @@ export function AccountOrdersClient({ locale }: AccountOrdersClientProps) {
       }
     }
 
-    fetchOrders();
-  }, [user, supabase.auth]);
+    fetchData();
+  }, [supabase]);
 
   const getStatusLabel = (status: string) => {
     const statusMap: Record<string, string> = {
@@ -212,7 +218,7 @@ export function AccountOrdersClient({ locale }: AccountOrdersClientProps) {
     );
   }
 
-  if (!user) {
+  if (!userId) {
     return (
       <div className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <h1 className="text-[1.35rem] tracking-[-0.02em] text-zinc-900 sm:text-[1.6rem]">{copy.title}</h1>
