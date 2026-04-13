@@ -11,6 +11,7 @@ import type { Perfume } from "@/types/catalog";
 type ProductCardProps = {
   perfume: Perfume;
   locale?: Locale;
+  sourceUrlOverride?: string;
 };
 
 type ShadowProfile = {
@@ -43,7 +44,7 @@ function getShadowProfile(slug: string): ShadowProfile {
   };
 }
 
-export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
+export function ProductCard({ perfume, locale = "az", sourceUrlOverride }: ProductCardProps) {
   const startingPrice = perfume.sizes[0]?.price;
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const t = getDictionary(locale);
@@ -61,7 +62,9 @@ export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
       return;
     }
 
-    const sourceUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const sourceUrl =
+      sourceUrlOverride ||
+      `${window.location.pathname}${window.location.search}${window.location.hash}`;
     sessionStorage.setItem(
       "perfoumer:last-list-context",
       JSON.stringify({
@@ -74,7 +77,10 @@ export function ProductCard({ perfume, locale = "az" }: ProductCardProps) {
 
   return (
     <Link
-      href={`/perfumes/${perfume.slug}`}
+      href={{
+        pathname: `/perfumes/${perfume.slug}`,
+        query: { v: perfume.id },
+      }}
       onClick={handleCardClick}
       className="product-card group relative block rounded-[1.65rem] bg-white p-2.5 shadow-sm ring-1 ring-zinc-200 sm:rounded-3xl sm:p-4"
     >

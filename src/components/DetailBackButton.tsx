@@ -47,29 +47,10 @@ export function DetailBackButton({ locale }: DetailBackButtonProps) {
     setSource(getStoredContext());
   }, []);
 
-  const label = useMemo(() => {
-    if (!source?.sourceUrl) {
-      return t.detail.back;
-    }
-
-    if (source.sourceUrl.startsWith("/catalog")) {
-      return t.detail.backToCatalog;
-    }
-
-    if (source.sourceUrl.startsWith("/")) {
-      return t.detail.backToHome;
-    }
-
-    return t.detail.back;
-  }, [source, t.detail.back, t.detail.backToCatalog, t.detail.backToHome]);
+  const label = useMemo(() => t.detail.back, [t.detail.back]);
 
   const onBack = () => {
     const context = getStoredContext();
-
-    if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-      return;
-    }
 
     if (context?.sourceUrl) {
       sessionStorage.setItem(
@@ -81,6 +62,11 @@ export function DetailBackButton({ locale }: DetailBackButtonProps) {
         }),
       );
       router.push(context.sourceUrl, { scroll: false });
+      return;
+    }
+
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
       return;
     }
 

@@ -659,6 +659,53 @@ export function CatalogClient({
   const panelDescription = lockedNoteFilter
     ? formatMessage(t.catalog.noteDiscovery, { note: lockedNoteFilter.label })
     : t.catalog.signature;
+  const sourceCatalogUrl = useMemo(() => {
+    const params = new URLSearchParams();
+
+    if (query.trim()) {
+      params.set("q", query.trim());
+    }
+
+    if (selectedBrand !== "all") {
+      params.set("brand", selectedBrand);
+    }
+
+    const selectedNote =
+      selectedTopNote !== lockedTopNote
+        ? selectedTopNote
+        : selectedHeartNote !== lockedHeartNote
+          ? selectedHeartNote
+          : selectedBaseNote !== lockedBaseNote
+            ? selectedBaseNote
+            : lockedNoteFilter?.slug;
+
+    if (selectedNote && selectedNote !== "all") {
+      params.set("note", selectedNote);
+    }
+
+    if (selectedMinPrice !== null) {
+      params.set("min", String(selectedMinPrice));
+    }
+
+    if (selectedMaxPrice !== null) {
+      params.set("max", String(selectedMaxPrice));
+    }
+
+    const serialized = params.toString();
+    return serialized ? `/catalog?${serialized}` : "/catalog";
+  }, [
+    lockedBaseNote,
+    lockedHeartNote,
+    lockedNoteFilter?.slug,
+    lockedTopNote,
+    query,
+    selectedBaseNote,
+    selectedBrand,
+    selectedHeartNote,
+    selectedMaxPrice,
+    selectedMinPrice,
+    selectedTopNote,
+  ]);
 
   return (
     <>
@@ -925,7 +972,7 @@ export function CatalogClient({
             className="catalog-card-reveal"
             style={{ animationDelay: `${Math.min(index, 12) * 42}ms` }}
           >
-            <ProductCard perfume={perfume} locale={locale} />
+            <ProductCard perfume={perfume} locale={locale} sourceUrlOverride={sourceCatalogUrl} />
           </div>
         ))}
       </section>

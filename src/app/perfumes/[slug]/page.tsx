@@ -23,7 +23,11 @@ import { getSupabasePublicConfigFromServer } from "@/lib/supabase/env.server";
 
 type PerfumeDetailPageProps = {
   params: Promise<{ slug: string }>;
+  searchParams?: Promise<{ v?: string | string[] }>;
 };
+
+const getVariantId = (value: string | string[] | undefined) =>
+  Array.isArray(value) ? value[0] : value;
 
 export async function generateStaticParams() {
   const perfumes = await getPerfumes();
@@ -32,9 +36,11 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: PerfumeDetailPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const perfume = await getPerfumeBySlug(slug);
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const perfume = await getPerfumeBySlug(slug, getVariantId(resolvedSearchParams?.v));
 
   if (!perfume) {
     return {
@@ -87,13 +93,16 @@ export async function generateMetadata({
 
 export default async function PerfumeDetailPage({
   params,
+  searchParams,
 }: PerfumeDetailPageProps) {
   const supabaseConfig = getSupabasePublicConfigFromServer();
   const locale = await getCurrentLocale();
   const t = getDictionary(locale);
   const { slug } = await params;
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
+  const variantId = getVariantId(resolvedSearchParams?.v);
   const [perfume, relatedPerfumes] = await Promise.all([
-    getPerfumeBySlug(slug),
+    getPerfumeBySlug(slug, variantId),
     getRelatedPerfumes(slug),
   ]);
 

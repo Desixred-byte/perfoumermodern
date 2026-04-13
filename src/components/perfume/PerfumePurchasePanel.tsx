@@ -23,6 +23,7 @@ type Copy = {
   bestValue: string;
   perMl: string;
   addToCart: string;
+  inquiry: string;
   adding: string;
   added: string;
   addFailed: string;
@@ -37,6 +38,7 @@ const copyByLocale: Record<Locale, Copy> = {
     bestValue: "Sərfəli",
     perMl: "1ml qiymət",
     addToCart: "Səbətə əlavə et",
+    inquiry: "Sorğu Göndər",
     adding: "Əlavə olunur...",
     added: "Məhsul seçilən ölçü ilə səbətə əlavə olundu.",
     addFailed: "Səbətə əlavə etmək alınmadı. Yenidən cəhd et.",
@@ -49,6 +51,7 @@ const copyByLocale: Record<Locale, Copy> = {
     bestValue: "Best value",
     perMl: "Price per 1ml",
     addToCart: "Add to cart",
+    inquiry: "Send inquiry",
     adding: "Adding...",
     added: "Added to cart with selected size.",
     addFailed: "Could not add to cart. Please try again.",
@@ -61,6 +64,7 @@ const copyByLocale: Record<Locale, Copy> = {
     bestValue: "Выгодно",
     perMl: "Цена за 1мл",
     addToCart: "Добавить в корзину",
+    inquiry: "Отправить запрос",
     adding: "Добавляем...",
     added: "Товар добавлен в корзину с выбранным объемом.",
     addFailed: "Не удалось добавить в корзину. Попробуйте снова.",
@@ -137,6 +141,24 @@ export function PerfumePurchasePanel({
     () => Math.max(...sizes.map((size) => size.ml), 1),
     [sizes],
   );
+  const inquiryHref = useMemo(() => {
+    const phone = "994507078070";
+    const fallbackPath = pathname || `/perfumes/${perfumeSlug}`;
+    const currentPathWithQuery =
+      typeof window === "undefined"
+        ? fallbackPath
+        : `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const absoluteProductUrl = `https://perfoumer.az${currentPathWithQuery}`;
+    const localizedPrompt =
+      locale === "az"
+        ? "Salam! Bu məhsul üçün qiymət və mövcudluq barədə məlumat almaq istəyirəm"
+        : locale === "ru"
+          ? "Здравствуйте! Хочу уточнить цену и наличие этого товара"
+          : "Hi! I would like to ask about price and availability for this product";
+
+    const message = `${localizedPrompt}: ${perfumeName} (${absoluteProductUrl})`;
+    return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
+  }, [locale, pathname, perfumeName, perfumeSlug]);
   const bestValueMl = useMemo(() => {
     if (!sizes.length) {
       return null;
@@ -390,32 +412,39 @@ export function PerfumePurchasePanel({
       </div>
 
       {selectedSize ? (
-        <>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => {
-                void addToCart(false);
-              }}
-              disabled={isSubmitting}
-              className="inline-flex min-h-13 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-lg font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting ? copy.adding : copy.addToCart}
-            </button>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => {
+              void addToCart(false);
+            }}
+            disabled={isSubmitting}
+            className="inline-flex min-h-13 items-center justify-center rounded-full border border-zinc-300 bg-white px-6 text-lg font-medium text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? copy.adding : copy.addToCart}
+          </button>
 
-            <button
-              type="button"
-              onClick={() => {
-                void addToCart(true);
-              }}
-              disabled={isSubmitting}
-              className="detail-cta detail-cta-primary inline-flex min-h-13 w-full items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isSubmitting ? copy.adding : t.detail.order}
-            </button>
-          </div>
-        </>
-      ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              void addToCart(true);
+            }}
+            disabled={isSubmitting}
+            className="detail-cta detail-cta-primary inline-flex min-h-13 w-full items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSubmitting ? copy.adding : t.detail.order}
+          </button>
+        </div>
+      ) : (
+        <a
+          href={inquiryHref}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="detail-cta detail-cta-primary inline-flex min-h-13 w-full items-center justify-center rounded-full bg-[#31302f] px-6 text-lg font-medium text-white transition hover:opacity-95"
+        >
+          {copy.inquiry}
+        </a>
+      )}
 
       {message ? (
         <p className={message.tone === "success" ? "text-sm text-emerald-700" : "text-sm text-red-600"}>

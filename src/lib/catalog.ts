@@ -467,10 +467,18 @@ export async function getRelatedPerfumes(
 
 export async function getPerfumeBySlug(
   slug: string,
+  variantId?: string,
 ): Promise<PerfumeWithNotes | null> {
   const [perfumes, notes] = await Promise.all([getPerfumes(), getNotes()]);
 
-  const perfume = perfumes.find((item) => item.slug === slug.toLowerCase());
+  const normalizedSlug = slug.toLowerCase();
+  const candidates = perfumes.filter((item) => item.slug === normalizedSlug);
+  if (!candidates.length) return null;
+
+  const normalizedVariantId = typeof variantId === "string" ? variantId.trim().toLowerCase() : "";
+  const perfume = normalizedVariantId
+    ? candidates.find((item) => item.id.toLowerCase() === normalizedVariantId) ?? candidates[0]
+    : candidates[0];
   if (!perfume) return null;
 
   const noteMap = new Map<string, Note>();
