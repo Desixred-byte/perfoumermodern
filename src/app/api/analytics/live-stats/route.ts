@@ -21,9 +21,10 @@ function normalizeCountryLabel(country: unknown, countryCode: unknown): string {
 }
 
 export async function GET() {
+  const isProd = process.env.NODE_ENV === "production";
   const configured = isAdminConfigured();
   const authenticated = configured ? await isAdminAuthenticated() : false;
-  if (!configured || !authenticated) {
+  if ((isProd && !configured) || (configured && !authenticated)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

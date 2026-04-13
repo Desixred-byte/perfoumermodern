@@ -17,10 +17,11 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function StatsPage() {
+  const isProd = process.env.NODE_ENV === "production";
   const configured = isAdminConfigured();
   const authenticated = configured ? await isAdminAuthenticated() : false;
 
-  if (!configured) {
+  if (!configured && isProd) {
     return (
       <div className="bg-[#f3f3f2]">
         <main className="mx-auto max-w-[860px] px-4 py-10 sm:px-6 md:py-14">
@@ -41,7 +42,7 @@ export default async function StatsPage() {
     );
   }
 
-  if (!authenticated) {
+  if (configured && !authenticated) {
     redirect("/admin?next=/stats");
   }
 
