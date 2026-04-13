@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { LiveStatsClient } from "@/components/stats/LiveStatsClient";
 import { isAdminAuthenticated, isAdminConfigured } from "@/lib/admin-auth";
@@ -19,8 +20,29 @@ export default async function StatsPage() {
   const configured = isAdminConfigured();
   const authenticated = configured ? await isAdminAuthenticated() : false;
 
-  if (!configured || !authenticated) {
-    notFound();
+  if (!configured) {
+    return (
+      <div className="bg-[#f3f3f2]">
+        <main className="mx-auto max-w-[860px] px-4 py-10 sm:px-6 md:py-14">
+          <section className="rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_14px_36px_rgba(24,24,24,0.08)] sm:p-8">
+            <h1 className="text-3xl tracking-[-0.02em] text-zinc-900 sm:text-4xl">Stats not configured</h1>
+            <p className="mt-3 text-sm leading-6 text-zinc-600 sm:text-base">
+              Set ADMIN_PASSWORD in your environment to enable the private analytics dashboard.
+            </p>
+            <Link
+              href="/"
+              className="mt-5 inline-flex min-h-10 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-5 text-sm font-semibold text-white"
+            >
+              Back to home
+            </Link>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
+  if (!authenticated) {
+    redirect("/admin?next=/stats");
   }
 
   return (
