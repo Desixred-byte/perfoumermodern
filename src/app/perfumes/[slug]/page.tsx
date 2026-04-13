@@ -15,6 +15,7 @@ import { PerfumeScentSummaryPanel } from "@/components/community/PerfumeScentSum
 import { PerfumeWishlistButton } from "@/components/community/PerfumeWishlistButton";
 import { PerfumeHeroCover } from "@/components/perfume/PerfumeHeroCover";
 import { PerfumePurchasePanel } from "@/components/perfume/PerfumePurchasePanel";
+import { PerfumeShareButton } from "@/components/perfume/PerfumeShareButton";
 import { getPerfumeBySlug, getPerfumes, getRelatedPerfumes } from "@/lib/catalog";
 import { getCurrentLocale } from "@/lib/i18n.server";
 import { getDictionary } from "@/lib/i18n";
@@ -108,6 +109,8 @@ export default async function PerfumeDetailPage({
 
   if (!perfume) notFound();
 
+  const shareUrl = absoluteUrl(`/perfumes/${perfume.slug}${variantId ? `?v=${encodeURIComponent(variantId)}` : ""}`);
+
   const detailSections = [
     {
       title: t.detail.about,
@@ -160,11 +163,18 @@ export default async function PerfumeDetailPage({
                 {perfume.name}
               </h1>
 
-              <PerfumeWishlistButton
-                perfumeSlug={perfume.slug}
-                locale={locale}
-                supabase={supabaseConfig}
-              />
+              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-start">
+                <PerfumeWishlistButton
+                  perfumeSlug={perfume.slug}
+                  locale={locale}
+                  supabase={supabaseConfig}
+                />
+                <PerfumeShareButton
+                  locale={locale}
+                  title={`${perfume.brand} ${perfume.name}`}
+                  url={shareUrl}
+                />
+              </div>
             </div>
 
             <p className="mt-3 flex items-center gap-2 text-lg text-zinc-500">

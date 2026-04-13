@@ -98,6 +98,7 @@ export function PerfumePurchasePanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "success" | "error" } | null>(null);
   const addLockRef = useRef(false);
+
   const emitCartUpdated = () => {
     if (typeof window === "undefined") {
       return;
@@ -147,6 +148,7 @@ export function PerfumePurchasePanel({
     () => Math.max(...sizes.map((size) => size.ml), 1),
     [sizes],
   );
+
   const inquiryHref = useMemo(() => {
     const phone = "994507078070";
     const variantQuery = variantId ? `?v=${encodeURIComponent(variantId)}` : "";
@@ -163,6 +165,7 @@ export function PerfumePurchasePanel({
     const message = `${localizedPrompt}: ${perfumeName} (${absoluteProductUrl})`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
   }, [copy.inquiryNoPrice, locale, perfumeName, perfumeSlug, sizes, variantId]);
+
   const bestValueMl = useMemo(() => {
     if (!sizes.length) {
       return null;
@@ -286,21 +289,21 @@ export function PerfumePurchasePanel({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-4 md:px-6">
-          <p className="text-[0.72rem] font-medium tracking-[0.22em] text-zinc-500 uppercase">
-            {t.detail.sizePrice}
-          </p>
-          {selectedSize ? (
-            <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[0.78rem] font-medium tracking-[0.02em] text-zinc-700">
-              {copy.selectedSize}: {selectedSize.ml}ml
+      {sizes.length ? (
+        <div className="overflow-hidden rounded-[1.6rem] border border-zinc-200 bg-white">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-200 px-4 py-4 md:px-6">
+            <p className="text-[0.72rem] font-medium tracking-[0.22em] text-zinc-500 uppercase">
+              {t.detail.sizePrice}
             </p>
-          ) : (
-            <p className="hidden text-sm text-zinc-500 md:block">{t.detail.choose}</p>
-          )}
-        </div>
+            {selectedSize ? (
+              <p className="rounded-full border border-zinc-200 bg-zinc-50 px-3 py-1 text-[0.78rem] font-medium tracking-[0.02em] text-zinc-700">
+                {copy.selectedSize}: {selectedSize.ml}ml
+              </p>
+            ) : (
+              <p className="hidden text-sm text-zinc-500 md:block">{t.detail.choose}</p>
+            )}
+          </div>
 
-        {sizes.length ? (
           <div className="grid grid-cols-3 gap-2 p-3 md:gap-3 md:p-4">
             {sizes.map((size) => {
               const isSelected = selectedSize?.ml === size.ml;
@@ -410,10 +413,10 @@ export function PerfumePurchasePanel({
               );
             })}
           </div>
-        ) : (
-          <div className="px-5 py-5 text-zinc-500">{t.detail.noPrice}</div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="text-zinc-500">{t.detail.noPrice}</div>
+      )}
 
       {selectedSize ? (
         <div className="grid gap-3 sm:grid-cols-2">
