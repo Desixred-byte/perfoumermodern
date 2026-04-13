@@ -286,6 +286,7 @@ const STORAGE_KEY = "perfoumer.checkout.addresses.v1";
 const ADDRESS_TABLE = "checkout_addresses";
 const EMAIL_SENT_STORAGE_KEY = "perfoumer.checkout.email.sent-orders.v1";
 const CART_CLEARED_STORAGE_KEY = "perfoumer.checkout.cart-cleared-orders.v1";
+const ORDER_SAVED_STORAGE_KEY = "perfoumer.checkout.order-saved.v1";
 
 type DraftFieldErrors = {
   fullName?: string;
@@ -596,9 +597,9 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
     if (!userId) return;
 
     const orderKey = `${paymentOrderId}:${userId}`;
-    const parseCleared = () => {
+    const parseStored = (key: string) => {
       try {
-        const raw = window.localStorage.getItem(CART_CLEARED_STORAGE_KEY);
+        const raw = window.localStorage.getItem(key);
         const parsed = raw ? (JSON.parse(raw) as string[]) : [];
         return Array.isArray(parsed) ? parsed : [];
       } catch {
@@ -606,15 +607,55 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
       }
     };
 
-    const markCleared = () => {
-      const existing = parseCleared();
+    const markStored = (key: string, maxSize: number) => {
+      const existing = parseStored(key);
       if (existing.includes(orderKey)) return;
-      window.localStorage.setItem(CART_CLEARED_STORAGE_KEY, JSON.stringify([orderKey, ...existing].slice(0, 120)));
+      window.localStorage.setItem(key, JSON.stringify([orderKey, ...existing].slice(0, maxSize)));
     };
 
-    if (parseCleared().includes(orderKey)) return;
+    if (parseStored(CART_CLEARED_STORAGE_KEY).includes(orderKey)) return;
+
+    const createOrderIfNeeded = async () => {
+      if (parseStored(ORDER_SAVED_STORAGE_KEY).includes(orderKey)) return true;
+      if (!session?.access_token) return false;
+      if (!items.length) return false;
+
+      const payloadItems = items.map((item) => ({
+        perfume_slug: item.row.perfume_slug,
+        perfume_name: item.perfume?.name || item.row.perfume_slug,
+        size_ml: item.row.size_ml,
+        quantity: item.quantity,
+        unit_price: Number(item.lineTotal / Math.max(item.quantity, 1)),
+        total_price: item.lineTotal,
+      }));
+
+      const response = await fetch("/api/profile/orders/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          payment_order_id: paymentOrderId,
+          payment_status: "completed",
+          total_amount: total,
+          selected_address_id: selectedShipping?.id || null,
+          items: payloadItems,
+        }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      markStored(ORDER_SAVED_STORAGE_KEY, 120);
+      return true;
+    };
 
     const clearCart = async () => {
+      const orderSaved = await createOrderIfNeeded();
+      if (!orderSaved) return;
+
       const { error } = await supabase
         .from("cart_items")
         .delete()
@@ -622,12 +663,12 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
 
       if (!error) {
         setCartRows([]);
-        markCleared();
+        markStored(CART_CLEARED_STORAGE_KEY, 120);
       }
     };
 
     void clearCart();
-  }, [paymentOrderId, paymentResult, session?.user?.id, supabase]);
+  }, [items, paymentOrderId, paymentResult, selectedShipping?.id, session?.access_token, session?.user?.id, supabase, total]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

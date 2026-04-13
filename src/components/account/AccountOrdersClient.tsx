@@ -121,6 +121,12 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
 
   useEffect(() => {
     async function fetchData() {
+      if (!supabase) {
+        setError("Supabase is not configured");
+        setLoading(false);
+        return;
+      }
+
       try {
         const { data: { user }, error: userError } = await supabase.auth.getUser();
 
