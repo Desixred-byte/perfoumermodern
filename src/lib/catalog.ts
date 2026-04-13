@@ -394,8 +394,7 @@ export async function getPerfumes(): Promise<Perfume[]> {
 
 export async function getFeaturedPerfumes(limit = 8): Promise<Perfume[]> {
   const perfumes = await getPerfumes();
-  const inStock = perfumes.filter((item) => item.inStock);
-  return rotateBySeed(inStock, `home-${getDailySeed()}`).slice(0, limit);
+  return rotateBySeed(perfumes, `home-${getDailySeed()}`).slice(0, limit);
 }
 
 export async function getRelatedPerfumes(

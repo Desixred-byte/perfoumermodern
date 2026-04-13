@@ -13,6 +13,16 @@ const nextConfig: NextConfig = {
 				hostname: "framerusercontent.com",
 				pathname: "/images/**",
 			},
+			{
+				protocol: "https",
+				hostname: "fimgs.net",
+				pathname: "/mdimg/perfume-thumbs/**",
+			},
+			{
+				protocol: "https",
+				hostname: "www.etirsah.com",
+				pathname: "/storage/photos/**",
+			},
 		],
 	},
 	async redirects() {

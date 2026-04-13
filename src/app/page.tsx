@@ -333,7 +333,6 @@ function dedupeForHomepage(perfumes: Perfume[]) {
 }
 
 function isHomepageEligible(perfume: Perfume) {
-  if (!perfume.inStock) return false;
   if (!perfume.sizes.length) return false;
 
   return perfume.sizes.some((size) => Number.isFinite(size.price) && size.price > 0);
