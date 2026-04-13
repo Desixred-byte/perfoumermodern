@@ -360,3 +360,46 @@ create policy "Users can delete own avatar images"
     bucket_id = 'avatars'
     and (storage.foldername(name))[1] = auth.uid()::text
   );
+
+-- Orders table for tracking customer purchases
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  order_number text not null unique,
+  status text not null default 'pending' check (status in ('pending', 'processing', 'completed', 'shipped', 'delivered', 'cancelled', 'refunded')),
+  payment_method text,
+  payment_status text not null default 'pending' check (payment_status in ('pending', 'completed', 'failed', 'refunded')),
+  total_amount numeric(10, 2) not null check (total_amount >= 0),
+  currency text not null default 'AZN',
+  items_json jsonb not null default '[]'::jsonb,
+  delivery_address_json jsonb,
+  tracking_number text,
+  kapital_order_id text,
+  kapital_payment_id text,
+  notes text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  completed_at timestamptz
+);
+
+create index if not exists orders_user_id_created_at_idx
+  on public.orders (user_id, created_at desc);
+
+create index if not exists orders_order_number_idx
+  on public.orders (order_number);
+
+create index if not exists orders_status_idx
+  on public.orders (status);
+
+create policy if not exists "Users can view their own orders"
+  on public.orders
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+create policy if not exists "Users can update their own order notes"
+  on public.orders
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
