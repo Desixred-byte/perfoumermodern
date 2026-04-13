@@ -178,6 +178,7 @@ export default async function PerfumeDetailPage({
               locale={locale}
               perfumeSlug={perfume.slug}
               perfumeName={`${perfume.brand} ${perfume.name}`}
+              variantId={variantId}
               sizes={perfume.sizes}
               supabase={supabaseConfig}
             />

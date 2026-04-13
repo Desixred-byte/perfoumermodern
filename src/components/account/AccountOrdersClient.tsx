@@ -222,15 +222,15 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
 
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
-      pending: "text-yellow-600 bg-yellow-50",
-      processing: "text-blue-600 bg-blue-50",
-      completed: "text-green-600 bg-green-50",
-      shipped: "text-blue-600 bg-blue-50",
-      delivered: "text-green-600 bg-green-50",
-      cancelled: "text-red-600 bg-red-50",
-      refunded: "text-orange-600 bg-orange-50",
+      pending: "border-amber-200 bg-amber-50/90 text-amber-700",
+      processing: "border-blue-200 bg-blue-50/90 text-blue-700",
+      completed: "border-emerald-200 bg-emerald-50/90 text-emerald-700",
+      shipped: "border-sky-200 bg-sky-50/90 text-sky-700",
+      delivered: "border-emerald-200 bg-emerald-50/90 text-emerald-700",
+      cancelled: "border-rose-200 bg-rose-50/90 text-rose-700",
+      refunded: "border-orange-200 bg-orange-50/90 text-orange-700",
     };
-    return colors[status] || "text-zinc-600 bg-zinc-50";
+    return colors[status] || "border-zinc-200 bg-zinc-50/90 text-zinc-700";
   };
 
   const getProgressIndex = (status: string) => {
@@ -248,6 +248,8 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
         return 1;
     }
   };
+
+  const progressSteps = [copy.stepPlaced, copy.stepProcessing, copy.stepShipped, copy.stepDelivered];
 
   const formatDate = (dateString: string) => {
     try {
@@ -327,11 +329,13 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
                 <p className="mt-1 text-sm text-zinc-500">{copy.date}: {formatDate(order.created_at)}</p>
               </div>
               <div className="flex flex-wrap gap-2 sm:justify-end">
-                <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.status)}`}>
+                <div className={`inline-flex items-center rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-[0.01em] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] ${getStatusColor(order.status)}`}>
+                  <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-full bg-current opacity-80" aria-hidden="true" />
                   {getStatusLabel(order.status)}
                 </div>
-                <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.payment_status)}`}>
-                  {copy.payment}: {getPaymentLabel(order.payment_status)}
+                <div className={`inline-flex items-center rounded-full border px-3.5 py-1.5 text-[11px] font-semibold tracking-[0.01em] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] ${getStatusColor(order.payment_status)}`}>
+                  <span className="mr-1.5 inline-block h-1.5 w-1.5 rounded-sm bg-current opacity-80" aria-hidden="true" />
+                  {copy.payment} · {getPaymentLabel(order.payment_status)}
                 </div>
               </div>
             </div>
@@ -341,20 +345,64 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
             <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4">
               <p className="mb-3 text-xs font-semibold tracking-[0.08em] text-zinc-500 uppercase">{copy.progress}</p>
               {order.status === "cancelled" ? (
-                <p className="text-sm font-medium text-red-700">{copy.cancelledHint}</p>
+                <p className="flex items-center gap-2 text-sm font-medium text-red-700">
+                  <span className="inline-block h-2 w-2 rounded-full bg-red-600" aria-hidden="true" />
+                  {copy.cancelledHint}
+                </p>
               ) : order.status === "refunded" ? (
-                <p className="text-sm font-medium text-orange-700">{copy.refundedHint}</p>
+                <p className="flex items-center gap-2 text-sm font-medium text-orange-700">
+                  <span className="inline-block h-2 w-2 rounded-full bg-orange-600" aria-hidden="true" />
+                  {copy.refundedHint}
+                </p>
               ) : (
                 <>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[copy.stepPlaced, copy.stepProcessing, copy.stepShipped, copy.stepDelivered].map((label, index) => {
+                  <div className="sm:hidden">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                      {progressSteps.map((label, index) => {
+                        const active = index + 1 <= getProgressIndex(order.status);
+                        const completed = index + 1 < getProgressIndex(order.status);
+                        return (
+                          <div key={label} className="flex min-w-[82px] flex-col items-center gap-1.5 text-center">
+                            <div
+                              className={`flex h-6 w-6 items-center justify-center rounded-full border ${active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-400"}`}
+                              aria-hidden="true"
+                            >
+                              {completed ? (
+                                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3.2 8.5l2.9 2.9 6-6" />
+                                </svg>
+                              ) : (
+                                <span className="text-[10px] font-semibold">{index + 1}</span>
+                              )}
+                            </div>
+                            <span className={`text-[10px] leading-3 ${active ? "font-medium text-zinc-900" : "text-zinc-400"}`}>{label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="hidden grid-cols-4 gap-2 sm:grid">
+                    {progressSteps.map((label, index) => {
                       const active = index + 1 <= getProgressIndex(order.status);
+                      const completed = index + 1 < getProgressIndex(order.status);
                       return (
                         <div key={label} className="flex flex-col items-center gap-2 text-center">
-                          <div
-                            className={`h-2 w-full rounded-full ${active ? "bg-zinc-900" : "bg-zinc-200"}`}
-                            aria-hidden="true"
-                          />
+                          <div className="flex w-full items-center gap-2">
+                            <div
+                              className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border ${active ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-400"}`}
+                              aria-hidden="true"
+                            >
+                              {completed ? (
+                                <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M3.2 8.5l2.9 2.9 6-6" />
+                                </svg>
+                              ) : (
+                                <span className="text-[10px] font-semibold">{index + 1}</span>
+                              )}
+                            </div>
+                            <div className={`h-2 w-full rounded-full ${active ? "bg-zinc-900" : "bg-zinc-200"}`} aria-hidden="true" />
+                          </div>
                           <span className={`text-[11px] leading-4 ${active ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
                             {label}
                           </span>
@@ -369,15 +417,15 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
             <div>
               <h4 className="mb-3 text-sm font-medium text-zinc-700">{copy.items}</h4>
               <div className="space-y-2">
-              {order.items.map((item, idx) => (
-                <div key={idx} className="flex items-start justify-between gap-3 text-sm text-zinc-600">
-                  <span className="max-w-[68%]">
-                    {item.perfume_name} ({item.size_ml}ML) × {item.quantity}
-                  </span>
-                  <span className="font-medium text-zinc-900">{item.total_price.toFixed(2)} {order.currency}</span>
-                </div>
-              ))}
-            </div>
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="flex items-start justify-between gap-3 text-sm text-zinc-600">
+                    <span className="max-w-[68%]">
+                      {item.perfume_name} ({item.size_ml}ML) × {item.quantity}
+                    </span>
+                    <span className="font-medium text-zinc-900">{item.total_price.toFixed(2)} {order.currency}</span>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="rounded-2xl border border-zinc-200 bg-white p-4">

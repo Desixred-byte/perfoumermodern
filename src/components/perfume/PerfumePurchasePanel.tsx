@@ -14,6 +14,7 @@ type PerfumePurchasePanelProps = {
   locale: Locale;
   perfumeSlug: string;
   perfumeName: string;
+  variantId?: string | null;
   sizes: PerfumeSize[];
   supabase: SupabasePublicConfig | null;
 };
@@ -30,6 +31,7 @@ type Copy = {
   cart: string;
   signInToSave: string;
   configMissing: string;
+  inquiryNoPrice: string;
 };
 
 const copyByLocale: Record<Locale, Copy> = {
@@ -45,6 +47,7 @@ const copyByLocale: Record<Locale, Copy> = {
     cart: "Səbətə keç",
     signInToSave: "Səbət üçün giriş et",
     configMissing: "Səbəti saxlamaq üçün Supabase konfiqurasiyası tələb olunur.",
+    inquiryNoPrice: "Salam! Bu məhsul haqqında məlumat paylaşa bilərsiniz?",
   },
   en: {
     selectedSize: "Selected size",
@@ -58,6 +61,7 @@ const copyByLocale: Record<Locale, Copy> = {
     cart: "Go to cart",
     signInToSave: "Sign in to save cart",
     configMissing: "Supabase configuration is required for cart storage.",
+    inquiryNoPrice: "Hi! Could you share more information about this product?",
   },
   ru: {
     selectedSize: "Выбранный объем",
@@ -71,6 +75,7 @@ const copyByLocale: Record<Locale, Copy> = {
     cart: "Перейти в корзину",
     signInToSave: "Войдите для сохранения корзины",
     configMissing: "Для сохранения корзины нужна настройка Supabase.",
+    inquiryNoPrice: "Здравствуйте! Можете поделиться дополнительной информацией об этом товаре?",
   },
 };
 
@@ -78,6 +83,7 @@ export function PerfumePurchasePanel({
   locale,
   perfumeSlug,
   perfumeName,
+  variantId,
   sizes,
   supabase: supabaseConfig,
 }: PerfumePurchasePanelProps) {
@@ -143,22 +149,20 @@ export function PerfumePurchasePanel({
   );
   const inquiryHref = useMemo(() => {
     const phone = "994507078070";
-    const fallbackPath = pathname || `/perfumes/${perfumeSlug}`;
-    const currentPathWithQuery =
-      typeof window === "undefined"
-        ? fallbackPath
-        : `${window.location.pathname}${window.location.search}${window.location.hash}`;
-    const absoluteProductUrl = `https://perfoumer.az${currentPathWithQuery}`;
-    const localizedPrompt =
-      locale === "az"
+    const variantQuery = variantId ? `?v=${encodeURIComponent(variantId)}` : "";
+    const absoluteProductUrl = `https://perfoumer.az/perfumes/${perfumeSlug}${variantQuery}`;
+    const hasPriceInCatalog = sizes.some((size) => Number.isFinite(size.price) && size.price > 0);
+    const localizedPrompt = hasPriceInCatalog
+      ? locale === "az"
         ? "Salam! Bu məhsul üçün qiymət və mövcudluq barədə məlumat almaq istəyirəm"
         : locale === "ru"
           ? "Здравствуйте! Хочу уточнить цену и наличие этого товара"
-          : "Hi! I would like to ask about price and availability for this product";
+          : "Hi! I would like to ask about price and availability for this product"
+      : copy.inquiryNoPrice;
 
     const message = `${localizedPrompt}: ${perfumeName} (${absoluteProductUrl})`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(message)}`;
-  }, [locale, pathname, perfumeName, perfumeSlug]);
+  }, [copy.inquiryNoPrice, locale, perfumeName, perfumeSlug, sizes, variantId]);
   const bestValueMl = useMemo(() => {
     if (!sizes.length) {
       return null;
