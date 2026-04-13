@@ -83,6 +83,19 @@ type Copy = {
   paymentStatusPending: string;
   paymentStatusUnknown: string;
   orderSummaryTitle: string;
+  deliveryEstimateTitle: string;
+  deliveryEstimateLoading: string;
+  deliveryEstimateEta: string;
+  deliveryEstimateCarrier: string;
+};
+
+type DeliveryEstimate = {
+  carrier: string;
+  zone: string;
+  city: string;
+  fee: number;
+  etaLabel: string;
+  freeThreshold: number;
 };
 
 const copyByLocale: Record<Locale, Copy> = {
@@ -142,6 +155,10 @@ const copyByLocale: Record<Locale, Copy> = {
     paymentStatusPending: "Emal olunur",
     paymentStatusUnknown: "Yoxlanılır",
     orderSummaryTitle: "Sifariş xülasəsi",
+    deliveryEstimateTitle: "Azerpoct ilə çatdırılma təxmini",
+    deliveryEstimateLoading: "Çatdırılma hesablanır...",
+    deliveryEstimateEta: "Təxmini müddət",
+    deliveryEstimateCarrier: "Daşıyıcı",
   },
   en: {
     loading: "Loading...",
@@ -199,6 +216,10 @@ const copyByLocale: Record<Locale, Copy> = {
     paymentStatusPending: "Processing",
     paymentStatusUnknown: "Checking",
     orderSummaryTitle: "Order summary",
+    deliveryEstimateTitle: "Estimated delivery via Azerpoct",
+    deliveryEstimateLoading: "Calculating delivery...",
+    deliveryEstimateEta: "Estimated time",
+    deliveryEstimateCarrier: "Carrier",
   },
   ru: {
     loading: "Загрузка...",
@@ -256,6 +277,10 @@ const copyByLocale: Record<Locale, Copy> = {
     paymentStatusPending: "В обработке",
     paymentStatusUnknown: "Проверяется",
     orderSummaryTitle: "Сводка заказа",
+    deliveryEstimateTitle: "Оценка доставки через Azerpoct",
+    deliveryEstimateLoading: "Рассчитываем доставку...",
+    deliveryEstimateEta: "Оценочное время",
+    deliveryEstimateCarrier: "Перевозчик",
   },
 };
 
@@ -287,6 +312,7 @@ const ADDRESS_TABLE = "checkout_addresses";
 const EMAIL_SENT_STORAGE_KEY = "perfoumer.checkout.email.sent-orders.v1";
 const CART_CLEARED_STORAGE_KEY = "perfoumer.checkout.cart-cleared-orders.v1";
 const ORDER_SAVED_STORAGE_KEY = "perfoumer.checkout.order-saved.v1";
+const ORDER_NUMBER_BY_PAYMENT_STORAGE_KEY = "perfoumer.checkout.order-number-by-payment.v1";
 
 type DraftFieldErrors = {
   fullName?: string;
@@ -393,6 +419,9 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
   const [paymentResult, setPaymentResult] = useState<PaymentResultKind | null>(null);
   const [isPaymentResultResolving, setIsPaymentResultResolving] = useState(false);
   const [paymentStatusText, setPaymentStatusText] = useState("");
+  const [canonicalOrderNumber, setCanonicalOrderNumber] = useState("");
+  const [deliveryEstimate, setDeliveryEstimate] = useState<DeliveryEstimate | null>(null);
+  const [isDeliveryEstimating, setIsDeliveryEstimating] = useState(false);
   const reviewStepEnteredAtRef = useRef(0);
 
   useEffect(() => {
@@ -573,7 +602,11 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
   );
 
   const subtotal = useMemo(() => Math.round(items.reduce((sum, item) => sum + item.lineTotal, 0) * 100) / 100, [items]);
-  const shippingPrice = deliveryMethod === "express" ? 5 : 0;
+  const shippingPrice = Number.isFinite(deliveryEstimate?.fee)
+    ? Number(deliveryEstimate?.fee)
+    : deliveryMethod === "express"
+      ? 5
+      : 0;
   const total = Math.round((subtotal + shippingPrice) * 100) / 100;
 
   const selectedShipping = addresses.find((item) => item.id === selectedShippingId) ?? null;
@@ -583,11 +616,81 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
     searchParams.get("OrderID") ||
     "";
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!paymentOrderId) {
+      setCanonicalOrderNumber("");
+      return;
+    }
+
+    try {
+      const raw = window.localStorage.getItem(ORDER_NUMBER_BY_PAYMENT_STORAGE_KEY);
+      const map = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+      const known = map[paymentOrderId];
+      if (typeof known === "string" && known.trim()) {
+        setCanonicalOrderNumber(known.trim());
+      }
+    } catch {
+      // ignore malformed storage payload
+    }
+  }, [paymentOrderId]);
+
   const canStepForward = useMemo(() => {
     if (step === 0) return Boolean(selectedShipping);
     if (step === 1) return true;
     return true;
   }, [selectedShipping, step]);
+
+  useEffect(() => {
+    if (!selectedShipping) {
+      setDeliveryEstimate(null);
+      return;
+    }
+
+    let isMounted = true;
+    setIsDeliveryEstimating(true);
+
+    const estimate = async () => {
+      try {
+        const response = await fetch("/api/geo/azerpost-estimate", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            city: selectedShipping.city,
+            country: selectedShipping.country,
+            deliveryMethod,
+            subtotal,
+            locale,
+          }),
+        });
+
+        if (!response.ok) {
+          if (isMounted) setDeliveryEstimate(null);
+          return;
+        }
+
+        const payload = (await response.json().catch(() => ({}))) as {
+          estimate?: DeliveryEstimate;
+        };
+
+        if (isMounted) {
+          setDeliveryEstimate(payload.estimate ?? null);
+        }
+      } catch {
+        if (isMounted) setDeliveryEstimate(null);
+      } finally {
+        if (isMounted) setIsDeliveryEstimating(false);
+      }
+    };
+
+    void estimate();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [deliveryMethod, selectedShipping, subtotal]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -613,10 +716,27 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
       window.localStorage.setItem(key, JSON.stringify([orderKey, ...existing].slice(0, maxSize)));
     };
 
+    const persistOrderNumber = (orderNumber: string) => {
+      const normalized = orderNumber.trim();
+      if (!normalized) return;
+
+      setCanonicalOrderNumber(normalized);
+      try {
+        const raw = window.localStorage.getItem(ORDER_NUMBER_BY_PAYMENT_STORAGE_KEY);
+        const current = raw ? (JSON.parse(raw) as Record<string, string>) : {};
+        current[paymentOrderId] = normalized;
+        window.localStorage.setItem(ORDER_NUMBER_BY_PAYMENT_STORAGE_KEY, JSON.stringify(current));
+      } catch {
+        // ignore storage failures
+      }
+    };
+
     if (parseStored(CART_CLEARED_STORAGE_KEY).includes(orderKey)) return;
 
     const createOrderIfNeeded = async () => {
-      if (parseStored(ORDER_SAVED_STORAGE_KEY).includes(orderKey)) return true;
+      if (parseStored(ORDER_SAVED_STORAGE_KEY).includes(orderKey)) {
+        return true;
+      }
       if (!session?.access_token) return false;
       if (!items.length) return false;
 
@@ -648,6 +768,15 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
         return false;
       }
 
+      const payload = (await response.json().catch(() => ({}))) as {
+        order?: { order_number?: string };
+      };
+
+      const orderNumber = payload.order?.order_number;
+      if (typeof orderNumber === "string" && orderNumber.trim()) {
+        persistOrderNumber(orderNumber);
+      }
+
       markStored(ORDER_SAVED_STORAGE_KEY, 120);
       return true;
     };
@@ -674,11 +803,12 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
     if (typeof window === "undefined") return;
     if (paymentResult !== "success") return;
     if (!paymentOrderId) return;
+    if (!canonicalOrderNumber) return;
 
     const email = session?.user?.email?.trim();
     if (!email) return;
 
-    const orderKey = `${paymentOrderId}:${email.toLowerCase()}`;
+    const orderKey = `${canonicalOrderNumber}:${email.toLowerCase()}`;
 
     const parseSent = () => {
       try {
@@ -711,7 +841,7 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
           body: JSON.stringify({
             locale,
             email,
-            orderId: paymentOrderId || undefined,
+            orderId: canonicalOrderNumber,
             status: paymentStatusText || "",
             total,
             shippingPrice,
@@ -739,7 +869,7 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
     };
 
     void send();
-  }, [items, locale, paymentOrderId, paymentResult, paymentStatusText, selectedShipping, session?.user?.email, shippingPrice, subtotal, total]);
+  }, [canonicalOrderNumber, items, locale, paymentOrderId, paymentResult, paymentStatusText, selectedShipping, session?.user?.email, shippingPrice, subtotal, total]);
 
   const addAddress = async () => {
     if (isSavingAddress) return;
@@ -1143,6 +1273,32 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
                 <input type="radio" checked={deliveryMethod === "express"} onChange={() => setDeliveryMethod("express")} />
                 <span>{copy.express}</span>
               </label>
+
+              <div className="rounded-2xl border border-zinc-200 bg-white/88 p-3 text-sm text-zinc-700">
+                <p className="text-xs font-semibold tracking-[0.09em] text-zinc-500 uppercase">
+                  {copy.deliveryEstimateTitle}
+                </p>
+                {isDeliveryEstimating ? (
+                  <p className="mt-2 text-zinc-500">{copy.deliveryEstimateLoading}</p>
+                ) : deliveryEstimate ? (
+                  <div className="mt-2 space-y-1.5">
+                    <p>
+                      <span className="text-zinc-500">{copy.deliveryEstimateCarrier}: </span>
+                      <span className="font-medium text-zinc-900">{deliveryEstimate.carrier}</span>
+                    </p>
+                    <p>
+                      <span className="text-zinc-500">{copy.shipping}: </span>
+                      <span className="font-medium text-zinc-900">{shippingPrice} ₼</span>
+                    </p>
+                    <p>
+                      <span className="text-zinc-500">{copy.deliveryEstimateEta}: </span>
+                      <span className="font-medium text-zinc-900">{deliveryEstimate.etaLabel}</span>
+                    </p>
+                  </div>
+                ) : (
+                  <p className="mt-2 text-zinc-500">-</p>
+                )}
+              </div>
             </div>
           ) : null}
 
@@ -1203,6 +1359,11 @@ export function CheckoutClient({ perfumes, locale, supabase: supabaseConfig }: C
             <span>{copy.shipping}</span>
             <span>{shippingPrice} ₼</span>
           </div>
+          {deliveryEstimate ? (
+            <div className="text-xs text-zinc-500">
+              {copy.deliveryEstimateTitle}: {deliveryEstimate.etaLabel}
+            </div>
+          ) : null}
           <div className="flex items-center justify-between text-base font-semibold text-zinc-900">
             <span>{copy.total}</span>
             <span>{total} ₼</span>

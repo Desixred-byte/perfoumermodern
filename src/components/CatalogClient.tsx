@@ -19,6 +19,7 @@ import {
 } from "@phosphor-icons/react";
 
 import { formatMessage, getDictionary, type Locale } from "@/lib/i18n";
+import { localizeNoteLabel } from "@/lib/note-label";
 import { ProductCard } from "@/components/ProductCard";
 import type { Perfume } from "@/types/catalog";
 
@@ -61,6 +62,14 @@ type SearchSuggestion = {
   score: number;
 };
 
+type SmartSearchIntent = {
+  tokens: string[];
+  minPrice: number | null;
+  maxPrice: number | null;
+  genderHint: "all" | "male" | "female" | "unisex";
+  noteHints: string[];
+};
+
 const PAGE_SIZE = 8;
 const isNonNull = <T,>(value: T | null): value is T => value !== null;
 
@@ -68,11 +77,106 @@ function getStartingPrice(perfume: Perfume) {
   return perfume.sizes[0]?.price ?? Number.POSITIVE_INFINITY;
 }
 
-function toNoteLabel(slug: string) {
-  return slug
-    .split("-")
-    .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
-    .join(" ");
+function toNoteLabel(slug: string, locale: Locale) {
+  return localizeNoteLabel({ slug, name: "" }, locale);
+}
+
+function parseSmartSearchIntent(rawQuery: string): SmartSearchIntent {
+  const normalized = rawQuery.toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g, " ");
+  const tokens = normalized
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 2);
+
+  const underMatch = normalized.match(/(?:under|below|less\s+than|sub)\s*(\d{2,4})/i);
+  const overMatch = normalized.match(/(?:over|above|more\s+than)\s*(\d{2,4})/i);
+  const betweenMatch = normalized.match(/(\d{2,4})\s*(?:-|to)\s*(\d{2,4})/i);
+
+  let minPrice: number | null = null;
+  let maxPrice: number | null = null;
+
+  if (betweenMatch) {
+    minPrice = Number.parseInt(betweenMatch[1] || "", 10);
+    maxPrice = Number.parseInt(betweenMatch[2] || "", 10);
+  } else {
+    if (underMatch) {
+      maxPrice = Number.parseInt(underMatch[1] || "", 10);
+    }
+    if (overMatch) {
+      minPrice = Number.parseInt(overMatch[1] || "", 10);
+    }
+  }
+
+  const genderHint: SmartSearchIntent["genderHint"] =
+    /(male|men|man|kis[iı]|kişi|muzh|муж)/iu.test(normalized)
+      ? "male"
+      : /(female|women|woman|qad[iı]n|жен|дам)/iu.test(normalized)
+        ? "female"
+        : /(unisex)/iu.test(normalized)
+          ? "unisex"
+          : "all";
+
+  const noteHints = Array.from(
+    new Set(
+      tokens.flatMap((token) => {
+        if (["fresh", "citrus", "summer", "yay", "clean", "aquatic"].includes(token)) {
+          return ["citrus", "bergamot", "marine", "aquatic", "grapefruit", "lemon"];
+        }
+        if (["sweet", "vanilla", "gourmand", "desert", "caramel"].includes(token)) {
+          return ["vanilla", "tonka", "caramel", "amber", "praline", "chocolate"];
+        }
+        if (["woody", "wood", "oud", "office", "formal"].includes(token)) {
+          return ["oud", "sandalwood", "cedar", "vetiver", "patchouli", "musk"];
+        }
+        if (["floral", "rose", "yasemin", "jasmine"].includes(token)) {
+          return ["rose", "jasmine", "lily", "peony", "violet", "floral"];
+        }
+        return [token];
+      }),
+    ),
+  );
+
+  return {
+    tokens,
+    minPrice: Number.isFinite(minPrice) ? minPrice : null,
+    maxPrice: Number.isFinite(maxPrice) ? maxPrice : null,
+    genderHint,
+    noteHints,
+  };
+}
+
+function scoreSmartMatch(perfume: Perfume, intent: SmartSearchIntent): number {
+  if (!intent.tokens.length) return 0;
+
+  const name = perfume.name.toLowerCase();
+  const brand = perfume.brand.toLowerCase();
+  const gender = perfume.gender.toLowerCase();
+  const notePool = [
+    ...perfume.noteSlugs.top,
+    ...perfume.noteSlugs.heart,
+    ...perfume.noteSlugs.base,
+  ].join(" ");
+
+  let score = 0;
+
+  for (const token of intent.tokens) {
+    if (name.includes(token)) score += 35;
+    if (brand.includes(token)) score += 24;
+    if (notePool.includes(token)) score += 18;
+  }
+
+  for (const hint of intent.noteHints) {
+    if (notePool.includes(hint)) {
+      score += 9;
+    }
+  }
+
+  if (intent.genderHint === "male" && /(men|male|kişi|man)/iu.test(gender)) score += 14;
+  if (intent.genderHint === "female" && /(women|female|qadın|woman)/iu.test(gender)) score += 14;
+  if (intent.genderHint === "unisex" && /unisex/iu.test(gender)) score += 14;
+  if (perfume.inStock) score += 4;
+
+  return score;
 }
 
 function PillButton({
@@ -408,14 +512,21 @@ export function CatalogClient({
     [t.catalog.featured, t.catalog.nameAsc, t.catalog.priceAsc, t.catalog.priceDesc],
   );
 
+  const smartSearchIntent = useMemo(
+    () => parseSmartSearchIntent(deferredQuery),
+    [deferredQuery],
+  );
+
   const filteredPerfumes = useMemo(() => {
     const normalizedQuery = deferredQuery.trim().toLowerCase();
 
     const filtered = perfumes.filter((perfume) => {
+      const smartScore = scoreSmartMatch(perfume, smartSearchIntent);
       const matchesQuery =
         !normalizedQuery ||
         perfume.name.toLowerCase().includes(normalizedQuery) ||
-        perfume.brand.toLowerCase().includes(normalizedQuery);
+        perfume.brand.toLowerCase().includes(normalizedQuery) ||
+        smartScore >= 24;
 
       const matchesGender =
         selectedGender === "all" ||
@@ -436,6 +547,16 @@ export function CatalogClient({
       const startingPrice = getStartingPrice(perfume);
       const matchesMinPrice = selectedMinPrice === null || startingPrice >= selectedMinPrice;
       const matchesMaxPrice = selectedMaxPrice === null || startingPrice <= selectedMaxPrice;
+      const matchesSmartMinPrice =
+        smartSearchIntent.minPrice === null || startingPrice >= smartSearchIntent.minPrice;
+      const matchesSmartMaxPrice =
+        smartSearchIntent.maxPrice === null || startingPrice <= smartSearchIntent.maxPrice;
+      const perfumeGender = perfume.gender.toLowerCase();
+      const matchesSmartGender =
+        smartSearchIntent.genderHint === "all" ||
+        (smartSearchIntent.genderHint === "male" && /(men|male|kişi|man)/iu.test(perfumeGender)) ||
+        (smartSearchIntent.genderHint === "female" && /(women|female|qadın|woman)/iu.test(perfumeGender)) ||
+        (smartSearchIntent.genderHint === "unisex" && /unisex/iu.test(perfumeGender));
 
       return (
         matchesQuery &&
@@ -445,7 +566,10 @@ export function CatalogClient({
         matchesHeartNote &&
         matchesBaseNote &&
         matchesMinPrice &&
-        matchesMaxPrice
+        matchesMaxPrice &&
+        matchesSmartMinPrice &&
+        matchesSmartMaxPrice &&
+        matchesSmartGender
       );
     });
 
@@ -473,6 +597,7 @@ export function CatalogClient({
     selectedMinPrice,
     selectedTopNote,
     sortBy,
+    smartSearchIntent,
   ]);
 
   useEffect(() => {
@@ -608,21 +733,21 @@ export function CatalogClient({
     selectedTopNote !== lockedTopNote
       ? {
           key: "top",
-          label: toNoteLabel(selectedTopNote),
+          label: toNoteLabel(selectedTopNote, locale),
           onClear: () => updateTopNote(lockedTopNote),
         }
       : null,
     selectedHeartNote !== lockedHeartNote
       ? {
           key: "heart",
-          label: toNoteLabel(selectedHeartNote),
+          label: toNoteLabel(selectedHeartNote, locale),
           onClear: () => updateHeartNote(lockedHeartNote),
         }
       : null,
     selectedBaseNote !== lockedBaseNote
       ? {
           key: "base",
-          label: toNoteLabel(selectedBaseNote),
+          label: toNoteLabel(selectedBaseNote, locale),
           onClear: () => updateBaseNote(lockedBaseNote),
         }
       : null,
@@ -1144,7 +1269,7 @@ export function CatalogClient({
                       <OptionCluster
                         options={topNotes.map((note) => ({
                           value: note,
-                          label: note === "all" ? t.catalog.topNotes : toNoteLabel(note),
+                          label: note === "all" ? t.catalog.topNotes : toNoteLabel(note, locale),
                         }))}
                         value={selectedTopNote}
                         onChange={updateTopNote}
@@ -1158,7 +1283,7 @@ export function CatalogClient({
                       <OptionCluster
                         options={heartNotes.map((note) => ({
                           value: note,
-                          label: note === "all" ? t.catalog.heartNotes : toNoteLabel(note),
+                          label: note === "all" ? t.catalog.heartNotes : toNoteLabel(note, locale),
                         }))}
                         value={selectedHeartNote}
                         onChange={updateHeartNote}
@@ -1172,7 +1297,7 @@ export function CatalogClient({
                       <OptionCluster
                         options={baseNotes.map((note) => ({
                           value: note,
-                          label: note === "all" ? t.catalog.baseNotes : toNoteLabel(note),
+                          label: note === "all" ? t.catalog.baseNotes : toNoteLabel(note, locale),
                         }))}
                         value={selectedBaseNote}
                         onChange={updateBaseNote}

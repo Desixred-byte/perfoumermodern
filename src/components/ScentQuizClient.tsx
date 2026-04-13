@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { ProductCard } from "@/components/ProductCard";
 import type { Locale } from "@/lib/i18n";
-import type { Perfume } from "@/types/catalog";
+import { humanizeNoteToken, localizeNoteLabel } from "@/lib/note-label";
+import type { Note, Perfume } from "@/types/catalog";
 
 type QuizAnswers = {
   gender: string;
@@ -200,29 +202,6 @@ const QUIZ_DICTIONARY: Record<Locale, QuizDictionary> = {
       },
       {
         kind: "choice",
-        key: "season",
-        title: "Əsas mövsüm hansıdır?",
-        description: "Mövsüm seçimi AI nəticəsini daha düzgün edir.",
-        options: [
-          { value: "all", label: "Bütün mövsüm", hint: "Universallıq" },
-          { value: "summer", label: "Yay", hint: "Yüngül və təravətli" },
-          { value: "winter", label: "Qış", hint: "Daha isti və dolğun" },
-          { value: "spring", label: "Yaz/Payız", hint: "Balanslı keçid qoxuları" },
-        ],
-      },
-      {
-        kind: "choice",
-        key: "longevity",
-        title: "Qalıcılıq gözləntin necədir?",
-        description: "AI bunu prioritetləşdirmədə istifadə edir.",
-        options: [
-          { value: "moderate", label: "Orta", hint: "4-6 saat yetərlidir" },
-          { value: "long", label: "Uzun", hint: "8+ saat istəyirəm" },
-          { value: "beast", label: "Maksimum", hint: "Güclü iz buraxsın" },
-        ],
-      },
-      {
-        kind: "choice",
         key: "budget",
         title: "Başlanğıc büdcə aralığın nədir?",
         description: "Nəticələri büdcənə uyğun prioritetləşdiririk.",
@@ -381,13 +360,25 @@ const INITIAL_ANSWERS: QuizAnswers = {
   longevity: "",
 };
 
-const INITIAL_TEXT_ANSWERS: TextAnswers = {
-  favoriteNotes: "",
-  avoidNotes: "",
-};
-
 function normalize(value: string) {
   return value.trim().toLowerCase();
+}
+
+function sanitizeUserFacingText(value: string) {
+  return value
+    .replace(/\s*by\s*etirsah\s*perfume/giu, "")
+    .replace(/\s*etirsah\s*perfume/giu, "")
+    .replace(/\s*etirsah/giu, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function sanitizePerfumeForDisplay(perfume: Perfume): Perfume {
+  return {
+    ...perfume,
+    name: sanitizeUserFacingText(perfume.name),
+    brand: sanitizeUserFacingText(perfume.brand),
+  };
 }
 
 function collectPerfumeTokens(perfume: Perfume) {
@@ -489,10 +480,12 @@ function getResultTags(dictionary: QuizDictionary, answers: QuizAnswers) {
   ].filter(Boolean);
 }
 
-export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; locale: Locale }) {
+export function ScentQuizClient({ perfumes, notes, locale }: { perfumes: Perfume[]; notes: Note[]; locale: Locale }) {
   const dictionary = QUIZ_DICTIONARY[locale];
   const [answers, setAnswers] = useState<QuizAnswers>(INITIAL_ANSWERS);
-  const [textAnswers, setTextAnswers] = useState<TextAnswers>(INITIAL_TEXT_ANSWERS);
+  const [notePreferences, setNotePreferences] = useState<Record<string, "like" | "dislike">>({});
+  const [extraAiNotes, setExtraAiNotes] = useState("");
+  const [notesQuery, setNotesQuery] = useState("");
   const [stepIndex, setStepIndex] = useState(0);
   const [questionCardHeight, setQuestionCardHeight] = useState<number | null>(null);
   const [aiMatches, setAiMatches] = useState<Perfume[] | null>(null);
@@ -508,10 +501,23 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   const questionCardInnerRef = useRef<HTMLDivElement | null>(null);
   const lastGeneratedRef = useRef("");
 
-  const totalSteps = dictionary.questions.length;
-  const isComplete = stepIndex >= totalSteps;
-  const currentStepIndex = Math.min(stepIndex, Math.max(totalSteps - 1, 0));
-  const currentQuestion = dictionary.questions[currentStepIndex];
+  const choiceQuestions = useMemo(() => {
+    const seen = new Set<string>();
+    return dictionary.questions
+      .filter((question): question is ChoiceQuestion => question.kind === "choice")
+      .filter((question) => {
+        if (seen.has(question.key)) return false;
+        seen.add(question.key);
+        return true;
+      });
+  }, [dictionary.questions]);
+
+  const noteStepIndex = choiceQuestions.length;
+  const totalSteps = choiceQuestions.length + 1;
+  const isNotesStep = stepIndex === noteStepIndex;
+  const isComplete = stepIndex > noteStepIndex;
+  const currentStepIndex = Math.min(stepIndex, Math.max(choiceQuestions.length - 1, 0));
+  const currentQuestion = choiceQuestions[currentStepIndex];
 
   const topMatches = useMemo(() => {
     if (!isComplete) return [] as Perfume[];
@@ -529,31 +535,52 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
   const resultConfidence = useMemo(() => {
     const filledChoiceCount = Object.values(answers).filter(Boolean).length;
-    const filledTextCount = Object.values(textAnswers).filter((value) => value.trim().length > 1).length;
+    const filledTextCount =
+      (Object.keys(notePreferences).length > 0 ? 1 : 0) +
+      (extraAiNotes.trim().length > 1 ? 1 : 0);
     const score = 72 + filledChoiceCount * 2.6 + filledTextCount * 4.2;
     return Math.max(74, Math.min(98, Math.round(score)));
-  }, [answers, textAnswers]);
+  }, [answers, extraAiNotes, notePreferences]);
 
   const profileLine = [
-    answers.vibe ? getChoiceLabel(dictionary.questions, "vibe", answers.vibe) : "",
-    answers.profile ? getChoiceLabel(dictionary.questions, "profile", answers.profile) : "",
-    answers.intensity ? getChoiceLabel(dictionary.questions, "intensity", answers.intensity) : "",
+    answers.vibe ? getChoiceLabel(choiceQuestions, "vibe", answers.vibe) : "",
+    answers.profile ? getChoiceLabel(choiceQuestions, "profile", answers.profile) : "",
+    answers.intensity ? getChoiceLabel(choiceQuestions, "intensity", answers.intensity) : "",
   ]
     .filter(Boolean)
     .join(" • ");
 
   const fitLine = [
-    answers.occasion ? getChoiceLabel(dictionary.questions, "occasion", answers.occasion) : "",
-    answers.season ? getChoiceLabel(dictionary.questions, "season", answers.season) : "",
-    answers.longevity ? getChoiceLabel(dictionary.questions, "longevity", answers.longevity) : "",
+    answers.occasion ? getChoiceLabel(choiceQuestions, "occasion", answers.occasion) : "",
+    answers.season ? getChoiceLabel(choiceQuestions, "season", answers.season) : "",
+    answers.longevity ? getChoiceLabel(choiceQuestions, "longevity", answers.longevity) : "",
   ]
     .filter(Boolean)
     .join(" • ");
 
-  const notesLine = textAnswers.favoriteNotes.trim()
-    ? textAnswers.favoriteNotes.trim()
+  const likedNotes = useMemo(
+    () => Object.entries(notePreferences).filter(([, state]) => state === "like").map(([slug]) => slug),
+    [notePreferences],
+  );
+  const dislikedNotes = useMemo(
+    () => Object.entries(notePreferences).filter(([, state]) => state === "dislike").map(([slug]) => slug),
+    [notePreferences],
+  );
+
+  const noteBySlug = useMemo(() => {
+    return new Map(notes.map((note) => [note.slug, note]));
+  }, [notes]);
+
+  const notesLine = likedNotes.length
+    ? likedNotes
+        .slice(0, 4)
+        .map((slug) => {
+          const note = noteBySlug.get(slug);
+          return note ? localizeNoteLabel(note, locale) : humanizeNoteToken(slug);
+        })
+        .join(", ")
     : answers.profile
-      ? getChoiceLabel(dictionary.questions, "profile", answers.profile)
+      ? getChoiceLabel(choiceQuestions, "profile", answers.profile)
       : "-";
 
   const summaryChips = [
@@ -562,7 +589,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
     { label: dictionary.chipFit, value: fitLine || "-" },
   ];
 
-  const resultTags = getResultTags(dictionary, answers);
+  const resultTags = getResultTags({ ...dictionary, questions: choiceQuestions }, answers);
   const visibleMatches = isMobileLayout ? (aiMatches ?? []) : shownMatches;
   const featuredMatch = visibleMatches[0];
   const secondaryMatches = visibleMatches.slice(1);
@@ -578,17 +605,21 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   }, [aiSummary]);
 
   const progress = Math.round((Math.min(stepIndex, totalSteps) / totalSteps) * 100);
-  const currentAnswer = currentQuestion.kind === "choice" ? answers[currentQuestion.key] : textAnswers[currentQuestion.key];
+  const currentAnswer = currentQuestion ? answers[currentQuestion.key] : "";
 
   const onSelect = (value: string) => {
-    if (currentQuestion.kind !== "choice") return;
-
+    if (!currentQuestion) return;
     setAnswers((prev) => ({ ...prev, [currentQuestion.key]: value }));
   };
 
   const onNext = () => {
-    if (currentQuestion.kind === "choice" && !currentAnswer) return;
-    setStepIndex((prev) => Math.min(prev + 1, totalSteps));
+    if (isNotesStep) {
+      setStepIndex(totalSteps);
+      return;
+    }
+
+    if (!currentAnswer) return;
+    setStepIndex((prev) => Math.min(prev + 1, noteStepIndex));
   };
 
   const onPrevious = () => {
@@ -597,7 +628,9 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
 
   const onRestart = () => {
     setAnswers(INITIAL_ANSWERS);
-    setTextAnswers(INITIAL_TEXT_ANSWERS);
+    setNotePreferences({});
+    setExtraAiNotes("");
+    setNotesQuery("");
     setStepIndex(0);
     setAiMatches(null);
     setAiSummary("");
@@ -620,8 +653,9 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           locale,
           answers,
           freeText: [
-            textAnswers.favoriteNotes.trim() ? `favorites: ${textAnswers.favoriteNotes.trim()}` : "",
-            textAnswers.avoidNotes.trim() ? `avoid: ${textAnswers.avoidNotes.trim()}` : "",
+            likedNotes.length ? `favorite note slugs: ${likedNotes.join(", ")}` : "",
+            dislikedNotes.length ? `avoid note slugs: ${dislikedNotes.join(", ")}` : "",
+            extraAiNotes.trim() ? `extra preference notes: ${extraAiNotes.trim()}` : "",
           ]
             .filter(Boolean)
             .join("\n"),
@@ -659,7 +693,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
       }
 
       setAiMatches(mapped.length ? mapped : null);
-      setAiSummary((payload.summary ?? "").trim());
+      setAiSummary(sanitizeUserFacingText((payload.summary ?? "").trim()));
       setHasGeneratedAi(true);
     } catch {
       setAiError(dictionary.failed);
@@ -670,8 +704,8 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   };
 
   const generationKey = useMemo(
-    () => JSON.stringify({ answers, textAnswers, topSlugs: topMatches.map((item) => item.slug) }),
-    [answers, textAnswers, topMatches],
+    () => JSON.stringify({ answers, notePreferences, extraAiNotes, topSlugs: topMatches.map((item) => item.slug) }),
+    [answers, extraAiNotes, notePreferences, topMatches],
   );
 
   useEffect(() => {
@@ -733,8 +767,8 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
   }, [currentQuestion, isComplete]);
 
   const renderResultMeta = (perfume: Perfume, index: number, dense = false) => {
-    const tags = resultTags.length ? resultTags : [perfume.brand];
-    const profileLabel = answers.profile ? getChoiceLabel(dictionary.questions, "profile", answers.profile) : "";
+    const tags = resultTags.length ? resultTags : [sanitizeUserFacingText(perfume.brand) || "Seçim"];
+    const profileLabel = answers.profile ? getChoiceLabel(choiceQuestions, "profile", answers.profile) : "";
     const profileMatch =
       answers.profile && answers.profile in KEYWORDS.profile
         ? countMatches(collectPerfumeTokens(perfume), KEYWORDS.profile[answers.profile as keyof typeof KEYWORDS.profile])
@@ -792,12 +826,12 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
           className="mt-3 overflow-hidden transition-[height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
         >
           <div ref={questionCardInnerRef} className="py-1 sm:py-2">
-            <h2
+            {!isNotesStep ? (
+              <>
+                <h2
               className={[
                 "leading-tight text-zinc-900",
-                currentQuestion.kind === "text"
-                  ? "text-[1.95rem] tracking-[-0.02em] sm:text-[2.15rem]"
-                  : "text-[1.85rem] sm:text-[2rem]",
+                "text-[1.85rem] sm:text-[2rem]",
               ].join(" ")}
             >
               {currentQuestion.title}
@@ -805,13 +839,12 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
             <p
               className={[
                 "mt-1.5 text-zinc-500",
-                currentQuestion.kind === "text" ? "text-[1rem] sm:text-[1.04rem]" : "text-[0.95rem] sm:text-base",
+                "text-[0.95rem] sm:text-base",
               ].join(" ")}
             >
               {currentQuestion.description}
             </p>
 
-            {currentQuestion.kind === "choice" ? (
               <div className="mt-3 grid gap-2.5 sm:grid-cols-2 sm:gap-3">
                 {currentQuestion.options.map((option, index) => {
                   const active = currentAnswer === option.value;
@@ -836,25 +869,134 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                   );
                 })}
               </div>
+              </>
             ) : (
-              <div className="mt-3 rounded-[1.35rem] border border-zinc-200/85 bg-[linear-gradient(160deg,rgba(255,255,255,0.96)_0%,rgba(248,248,246,0.92)_100%)] p-3 shadow-[0_12px_30px_rgba(20,20,22,0.05)] sm:p-4">
-                <label className="block">
-                  <span className="mb-2 block text-[0.72rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
-                    {currentQuestion.label}
-                  </span>
-                  <textarea
-                    value={textAnswers[currentQuestion.key]}
-                    onChange={(event) =>
-                      setTextAnswers((prev) => ({
-                        ...prev,
-                        [currentQuestion.key]: event.target.value,
-                      }))
-                    }
-                    rows={4}
-                    placeholder={currentQuestion.placeholder}
-                    className="w-full resize-none rounded-2xl border border-zinc-200/80 bg-white/95 px-4 py-3.5 text-sm leading-relaxed text-zinc-800 outline-none shadow-[inset_0_1px_0_rgba(255,255,255,0.55)] transition-all duration-300 placeholder:text-zinc-400 focus:-translate-y-[1px] focus:border-zinc-300 focus:shadow-[0_14px_26px_rgba(20,20,22,0.08)]"
+              <div>
+                <h2 className="text-[1.85rem] leading-tight text-zinc-900 sm:text-[2rem]">
+                  {locale === "az"
+                    ? "Sevdiyin və sevmədiyin notları seç"
+                    : locale === "ru"
+                      ? "Выберите любимые и нежелательные ноты"
+                      : "Pick notes you like and dislike"}
+                </h2>
+                <p className="mt-1.5 text-[0.95rem] text-zinc-500 sm:text-base">
+                  {locale === "az"
+                    ? "Kartlara klik et: əvvəl sevilən, ikinci klik sevilməyən, üçüncü klik sıfırlayır."
+                    : locale === "ru"
+                      ? "Нажмите на карточку: сначала нравится, второй раз не нравится, третий раз сбрасывает выбор."
+                      : "Tap a card: first click likes, second dislikes, third resets."}
+                </p>
+
+                <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/90 p-3">
+                  <input
+                    value={notesQuery}
+                    onChange={(event) => setNotesQuery(event.target.value)}
+                    placeholder={locale === "az" ? "Not axtar..." : locale === "ru" ? "Поиск нот..." : "Search notes..."}
+                    className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 outline-none"
                   />
-                </label>
+                  <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                    {notes
+                      .filter((note) => {
+                        const term = normalize(notesQuery);
+                        if (!term) return true;
+                        return normalize(localizeNoteLabel(note, locale)).includes(term) || note.slug.includes(term);
+                      })
+                      .slice(0, 120)
+                      .map((note) => {
+                        const state = notePreferences[note.slug];
+                        return (
+                          <button
+                            key={note.slug}
+                            type="button"
+                            onClick={() => {
+                              setNotePreferences((prev) => {
+                                const next = { ...prev };
+                                const current = next[note.slug];
+                                if (!current) {
+                                  next[note.slug] = "like";
+                                  return next;
+                                }
+                                if (current === "like") {
+                                  next[note.slug] = "dislike";
+                                  return next;
+                                }
+                                delete next[note.slug];
+                                return next;
+                              });
+                            }}
+                            className={[
+                              "group rounded-xl border bg-white p-1.5 text-left transition-all duration-300",
+                              state === "like"
+                                ? "border-emerald-400 bg-emerald-50/65"
+                                : state === "dislike"
+                                  ? "border-rose-400 bg-rose-50/65"
+                                  : "border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50",
+                            ].join(" ")}
+                          >
+                            <div className="flex items-center gap-2 rounded-[0.7rem]">
+                              <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[0.65rem] bg-zinc-100">
+                                {note.image ? (
+                                  <Image
+                                    src={note.image}
+                                    alt={note.imageAlt || localizeNoteLabel(note, locale)}
+                                    fill
+                                    sizes="(max-width: 640px) 20vw, (max-width: 1024px) 14vw, 9vw"
+                                    className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+                                  />
+                                ) : (
+                                  <div className="grid h-full w-full place-items-center text-[0.6rem] text-zinc-400">Perfoumer</div>
+                                )}
+                              </div>
+
+                              <div className="min-w-0">
+                                <p className="line-clamp-1 text-[0.78rem] font-medium text-zinc-900">{localizeNoteLabel(note, locale)}</p>
+                                <p className="mt-0.5 line-clamp-1 text-[0.7rem] text-zinc-500">
+                                {state === "like"
+                                  ? locale === "az"
+                                    ? "Sevirəm"
+                                    : locale === "ru"
+                                      ? "Нравится"
+                                      : "Like"
+                                  : state === "dislike"
+                                    ? locale === "az"
+                                      ? "Sevmirəm"
+                                      : locale === "ru"
+                                        ? "Не нравится"
+                                        : "Dislike"
+                                    : locale === "az"
+                                      ? "Seçilməyib"
+                                      : locale === "ru"
+                                        ? "Не выбрано"
+                                        : "Not selected"}
+                                  </p>
+                                </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl border border-zinc-200 bg-white/90 p-3">
+                  <label className="block">
+                    <span className="mb-2 block text-[0.72rem] font-semibold tracking-[0.16em] text-zinc-500 uppercase">
+                      {locale === "az" ? "Əlavə qeyd (istəyə bağlı)" : locale === "ru" ? "Дополнительные пожелания (необязательно)" : "Extra notes (optional)"}
+                    </span>
+                    <textarea
+                      value={extraAiNotes}
+                      onChange={(event) => setExtraAiNotes(event.target.value)}
+                      rows={3}
+                      placeholder={
+                        locale === "az"
+                          ? "Məsələn: daha az şirin olsun, ofis üçün sakit qoxu, daha premium hiss..."
+                          : locale === "ru"
+                            ? "Например: меньше сладости, мягче для офиса, более премиальное звучание..."
+                            : "For example: less sweet, softer for office, more premium vibe..."
+                      }
+                      className="w-full resize-none rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-800 outline-none"
+                    />
+                  </label>
+                </div>
               </div>
             )}
 
@@ -870,7 +1012,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
               <button
                 type="button"
                 onClick={onNext}
-                disabled={currentQuestion.kind === "choice" && !currentAnswer}
+                disabled={!isNotesStep && !currentAnswer}
                 className="inline-flex min-h-10 items-center justify-center rounded-full border border-zinc-900 bg-zinc-900 px-5 text-sm font-semibold text-white transition md:hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-45 sm:min-h-11 sm:px-6"
               >
                 {dictionary.next}
@@ -939,7 +1081,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                   </div>
 
                   <div className="mt-3 border-t border-zinc-200 pt-3">
-                    <ProductCard perfume={featuredMatch} locale={locale} />
+                    <ProductCard perfume={sanitizePerfumeForDisplay(featuredMatch)} locale={locale} />
                   </div>
                 </section>
               ) : null}
@@ -952,7 +1094,7 @@ export function ScentQuizClient({ perfumes, locale }: { perfumes: Perfume[]; loc
                       <div key={perfume.id} className="qoxunu-mobile-slide min-w-[82vw] max-w-[82vw] snap-center rounded-xl border border-zinc-200 bg-white p-3">
                         {renderResultMeta(perfume, index + 2, true)}
                         <div className="mt-3 border-t border-zinc-200 pt-3">
-                          <ProductCard perfume={perfume} locale={locale} />
+                          <ProductCard perfume={sanitizePerfumeForDisplay(perfume)} locale={locale} />
                         </div>
                       </div>
                     ))}

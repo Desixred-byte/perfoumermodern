@@ -5,6 +5,7 @@ import { NoteTypeCatalogSection } from "@/components/NoteTypeCatalogSection";
 import { getNotes, getPerfumes } from "@/lib/catalog";
 import { formatMessage, getDictionary } from "@/lib/i18n";
 import { getCurrentLocale } from "@/lib/i18n.server";
+import { localizeNoteLabel } from "@/lib/note-label";
 import { absoluteUrl, buildAzeriPageKeywords } from "@/lib/seo";
 
 type NoteFilterType = "top" | "heart" | "base";
@@ -45,8 +46,12 @@ export async function generateMetadata({ params }: NotePageProps): Promise<Metad
   const { slug } = await params;
   const normalizedSlug = decodeSlug(slug).toLowerCase();
   const notes = await getNotes();
-  const noteName =
-    notes.find((item) => item.slug === normalizedSlug)?.name ?? fallbackNoteName(normalizedSlug);
+  const noteRaw =
+    notes.find((item) => item.slug === normalizedSlug) ?? {
+      slug: normalizedSlug,
+      name: fallbackNoteName(normalizedSlug),
+    };
+  const noteName = localizeNoteLabel(noteRaw, "az");
   const canonicalPath = `/notes/${normalizedSlug}`;
 
   return {
@@ -100,6 +105,7 @@ export default async function NotePage({
       imageAlt: "",
       content: "",
     };
+  const localizedNoteName = localizeNoteLabel(note, locale);
 
   return (
     <div className="bg-[#f3f3f2]">
@@ -109,13 +115,13 @@ export default async function NotePage({
             <div>
               <p className="text-sm text-zinc-500">{t.notePage.eyebrow}</p>
               <h1 className="mt-2 max-w-[12ch] text-[2.75rem] leading-[0.95] tracking-[-0.02em] text-zinc-800 sm:text-5xl md:text-7xl">
-                {formatMessage(t.notePage.title, { note: note.name })}
+                {formatMessage(t.notePage.title, { note: localizedNoteName })}
               </h1>
             </div>
 
             <div className="w-full max-w-xl">
               <p className="text-sm leading-6 text-zinc-500 md:text-base">
-                {formatMessage(t.notePage.description, { note: note.name.toLowerCase() })}
+                {formatMessage(t.notePage.description, { note: localizedNoteName.toLowerCase() })}
               </p>
             </div>
           </div>
@@ -125,7 +131,7 @@ export default async function NotePage({
           perfumes={perfumes}
           locale={locale}
           noteSlug={note.slug}
-          noteName={note.name}
+          noteName={localizedNoteName}
           initialType={noteType}
           labels={{
             top: t.notePage.top,

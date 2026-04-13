@@ -141,33 +141,31 @@ function money(value: number) {
   return `${Math.round(value * 100) / 100} AZN`;
 }
 
-function getPublicBaseUrl(request: Request) {
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL;
-  if (explicit && /^https?:\/\//i.test(explicit)) {
-    return explicit.replace(/\/$/, "");
-  }
+function isDisallowedPublicHost(url: URL) {
+  return (
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1" ||
+    url.hostname === "0.0.0.0" ||
+    url.hostname.endsWith(".local")
+  );
+}
 
-  const proto = request.headers.get("x-forwarded-proto");
-  const host = request.headers.get("x-forwarded-host");
-  if (proto && host) {
-    return `${proto}://${host}`.replace(/\/$/, "");
-  }
+function getPublicBaseUrl(_request: Request) {
+  const candidates = [
+    process.env.PERFOUMER_SITE_URL,
+    process.env.NEXT_PUBLIC_SITE_URL,
+    process.env.SITE_URL,
+  ].filter((value): value is string => Boolean(value && value.trim()));
 
-  const vercel = process.env.VERCEL_URL;
-  if (vercel) {
-    return `https://${vercel.replace(/\/$/, "")}`;
-  }
-
-  const origin = (() => {
+  for (const candidate of candidates) {
     try {
-      return new URL(request.url).origin;
+      const parsed = new URL(candidate);
+      if (!isDisallowedPublicHost(parsed)) {
+        return parsed.origin.replace(/\/$/, "");
+      }
     } catch {
-      return "";
+      // Ignore invalid URL candidates.
     }
-  })();
-
-  if (origin && !origin.includes("localhost")) {
-    return origin.replace(/\/$/, "");
   }
 
   return "https://perfoumer.az";
@@ -235,38 +233,38 @@ export async function POST(request: Request) {
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    body { margin: 0; background: #ffffff; }
-    .wrap { padding: 24px 12px; font-family: Poppins, Arial, sans-serif; }
+    body { margin: 0; background: #ece8dd; }
+    .wrap { padding: 24px 12px; font-family: Poppins, Arial, sans-serif; background: radial-gradient(circle at 12% 8%, #faf7ef 0%, #ece8dd 52%, #e4dece 100%); }
     .mail { max-width: 600px; margin: 0 auto; }
     .logo-row { text-align: center; padding: 14px 0 22px; }
     .logo-light { display: inline-block; }
     .logo-dark { display: none; }
     .logo { height: 36px; width: auto; }
-    .panel { background: #ffffff; border: 1px solid #000000; border-radius: 18px; overflow: hidden; margin-bottom: 14px; }
-    .hero { padding: 42px 28px; text-align: center; background: #ffffff; }
-    .title { margin: 0; color: #000000; font-size: 40px; line-height: 1.14; letter-spacing: -0.02em; font-family: 'Playfair Display', Georgia, serif; }
-    .intro { margin: 16px 0 0; color: #000000; font-family: Poppins, Arial, sans-serif; font-size: 16px; line-height: 1.6; }
+    .panel { background: #fffdf8; border: 1px solid #d8d0bb; border-radius: 18px; overflow: hidden; margin-bottom: 14px; box-shadow: 0 16px 40px rgba(60, 52, 35, 0.12); }
+    .hero { padding: 42px 28px; text-align: center; background: linear-gradient(160deg, #f8f3e7 0%, #efe7d6 100%); }
+    .title { margin: 0; color: #1d1a14; font-size: 40px; line-height: 1.14; letter-spacing: -0.02em; font-family: 'Playfair Display', Georgia, serif; }
+    .intro { margin: 16px 0 0; color: #4e4637; font-family: Poppins, Arial, sans-serif; font-size: 16px; line-height: 1.6; }
     .body { padding: 26px 24px 28px; }
-    .pill { margin: 0 0 14px; padding: 11px 13px; background: #ffffff; border: 1px solid #000000; border-radius: 12px; color: #000000; font-size: 14px; }
-    .heading { margin: 0 0 8px; color: #000000; font-family: Poppins, Arial, sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; }
+    .pill { margin: 0 0 14px; padding: 11px 13px; background: #f6efdc; border: 1px solid #d6c7a6; border-radius: 12px; color: #2a251b; font-size: 14px; }
+    .heading { margin: 0 0 8px; color: #5c5547; font-family: Poppins, Arial, sans-serif; font-size: 12px; text-transform: uppercase; letter-spacing: 0.09em; }
     .items { width: 100%; border-collapse: collapse; }
-    .items td { padding: 8px 0; color: #000000; font-size: 15px; }
+    .items td { padding: 8px 0; color: #1f1b14; font-size: 15px; }
     .items .price { text-align: right; }
-    .totals { margin-top: 8px; border-top: 1px solid #000000; padding-top: 10px; color: #000000; font-size: 14px; line-height: 1.8; }
-    .totals strong { color: #000000; }
-    .addr { margin-top: 14px; padding: 12px 13px; border: 1px solid #000000; border-radius: 12px; background: #ffffff; }
+    .totals { margin-top: 8px; border-top: 1px solid #dfd3b8; padding-top: 10px; color: #312a1f; font-size: 14px; line-height: 1.8; }
+    .totals strong { color: #201a12; }
+    .addr { margin-top: 14px; padding: 12px 13px; border: 1px solid #e0d5bc; border-radius: 12px; background: #fffaf0; }
     .split { width: 100%; border-collapse: collapse; }
     .split td { width: 50%; vertical-align: top; padding: 0; }
     .col-left { padding: 24px 10px 24px 24px !important; }
     .col-right { padding: 24px 24px 24px 10px !important; }
-    .tile { border: 1px solid #000000; border-radius: 14px; background: #ffffff; padding: 16px; min-height: 148px; }
-    .tile h3 { margin: 0 0 10px; color: #000000; font-size: 18px; font-family: 'Playfair Display', Georgia, serif; }
-    .tile p { margin: 0 0 12px; color: #000000; font-size: 14px; line-height: 1.5; font-family: Poppins, Arial, sans-serif; }
-    .tile a { color: #000000; text-decoration: underline; font-size: 14px; }
-    .footer { background: #ffffff; text-align: center; padding: 34px 20px; }
-    .footer p { margin: 0; color: #000000; font-family: Poppins, Arial, sans-serif; font-size: 13px; line-height: 1.7; }
-    .footer-links { margin-top: 12px; font-size: 12px; color: #000000; }
-    .footer-links a { color: #000000; text-decoration: none; margin: 0 8px; }
+    .tile { border: 1px solid #ded2b6; border-radius: 14px; background: #fff9ec; padding: 16px; min-height: 148px; }
+    .tile h3 { margin: 0 0 10px; color: #211a12; font-size: 18px; font-family: 'Playfair Display', Georgia, serif; }
+    .tile p { margin: 0 0 12px; color: #4d4537; font-size: 14px; line-height: 1.5; font-family: Poppins, Arial, sans-serif; }
+    .tile a { color: #1d1a14; text-decoration: underline; font-size: 14px; }
+    .footer { background: #f6efdf; text-align: center; padding: 34px 20px; }
+    .footer p { margin: 0; color: #3f3729; font-family: Poppins, Arial, sans-serif; font-size: 13px; line-height: 1.7; }
+    .footer-links { margin-top: 12px; font-size: 12px; color: #3f3729; }
+    .footer-links a { color: #221d15; text-decoration: none; margin: 0 8px; }
 
     @media (max-width: 620px) {
       .title { font-size: 32px; }
@@ -292,59 +290,59 @@ export async function POST(request: Request) {
         <img class="logo logo-dark" src="${logoDark}" alt="Perfoumer" width="196" height="36" style="height:36px;width:auto;display:none;" />
       </div>
 
-      <div class="panel" style="background:#ffffff;border:1px solid #000000;border-radius:18px;overflow:hidden;margin-bottom:14px;">
-        <div class="hero" style="padding:42px 28px;text-align:center;background:#ffffff;">
-          <h1 class="title" style="margin:0;color:#000000;font-size:40px;line-height:1.14;letter-spacing:-0.02em;font-family:'Playfair Display',Georgia,serif;">${copy.title}</h1>
-          <p class="intro" style="margin:16px 0 0;color:#000000;font-family:Poppins,Arial,sans-serif;font-size:16px;line-height:1.6;">${copy.intro}</p>
+      <div class="panel" style="background:#fffdf8;border:1px solid #d8d0bb;border-radius:18px;overflow:hidden;margin-bottom:14px;box-shadow:0 16px 40px rgba(60,52,35,0.12);">
+        <div class="hero" style="padding:42px 28px;text-align:center;background:linear-gradient(160deg,#f8f3e7 0%,#efe7d6 100%);">
+          <h1 class="title" style="margin:0;color:#1d1a14;font-size:40px;line-height:1.14;letter-spacing:-0.02em;font-family:'Playfair Display',Georgia,serif;">${copy.title}</h1>
+          <p class="intro" style="margin:16px 0 0;color:#4e4637;font-family:Poppins,Arial,sans-serif;font-size:16px;line-height:1.6;">${copy.intro}</p>
         </div>
 
         <div class="body" style="padding:26px 24px 28px;">
-          <p class="pill" style="margin:0 0 14px;padding:11px 13px;background:#ffffff;border:1px solid #000000;border-radius:12px;color:#000000;font-size:14px;"><strong>${copy.orderLabel}:</strong> ${escapeHtml(orderId)}</p>
+          <p class="pill" style="margin:0 0 14px;padding:11px 13px;background:#f6efdc;border:1px solid #d6c7a6;border-radius:12px;color:#2a251b;font-size:14px;"><strong>${copy.orderLabel}:</strong> ${escapeHtml(orderId)}</p>
 
-          <p class="heading" style="margin:0 0 8px;color:#000000;font-family:Poppins,Arial,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;">${copy.itemsLabel}</p>
+          <p class="heading" style="margin:0 0 8px;color:#5c5547;font-family:Poppins,Arial,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;">${copy.itemsLabel}</p>
           <table class="items" style="width:100%;border-collapse:collapse;">
             ${itemsRows || `<tr><td style="padding:8px 0;color:#000000;">-</td></tr>`}
           </table>
 
-          <div class="totals" style="margin-top:8px;border-top:1px solid #000000;padding-top:10px;color:#000000;font-size:14px;line-height:1.8;">
+          <div class="totals" style="margin-top:8px;border-top:1px solid #dfd3b8;padding-top:10px;color:#312a1f;font-size:14px;line-height:1.8;">
             <div><strong>${copy.subtotalLabel}:</strong> ${money(subtotal)}</div>
             <div><strong>${copy.shippingLabel}:</strong> ${money(shipping)}</div>
             <div><strong>${copy.totalLabel}:</strong> ${money(total)}</div>
           </div>
 
-          <p class="heading" style="margin:14px 0 8px;color:#000000;font-family:Poppins,Arial,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;">${copy.addressLabel}</p>
-          <div class="addr" style="margin-top:14px;padding:12px 13px;border:1px solid #000000;border-radius:12px;background:#ffffff;">${addressHtml}</div>
+          <p class="heading" style="margin:14px 0 8px;color:#5c5547;font-family:Poppins,Arial,sans-serif;font-size:12px;text-transform:uppercase;letter-spacing:0.09em;">${copy.addressLabel}</p>
+          <div class="addr" style="margin-top:14px;padding:12px 13px;border:1px solid #e0d5bc;border-radius:12px;background:#fffaf0;">${addressHtml}</div>
         </div>
       </div>
 
-      <div class="panel" style="background:#ffffff;border:1px solid #000000;border-radius:18px;overflow:hidden;margin-bottom:14px;">
+      <div class="panel" style="background:#fffdf8;border:1px solid #d8d0bb;border-radius:18px;overflow:hidden;margin-bottom:14px;box-shadow:0 16px 40px rgba(60,52,35,0.12);">
         <table class="split" role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
           <tr>
             <td class="col-left" style="width:50%;vertical-align:top;padding:24px 10px 24px 24px;">
-              <div class="tile" style="border:1px solid #000000;border-radius:14px;background:#ffffff;padding:16px;min-height:148px;">
-                <h3 style="margin:0 0 10px;color:#000000;font-size:18px;font-family:'Playfair Display',Georgia,serif;">${copy.supportTitle}</h3>
-                <p style="margin:0 0 12px;color:#000000;font-size:14px;line-height:1.5;font-family:Poppins,Arial,sans-serif;">${copy.supportBody}</p>
-                <a href="mailto:orders@perfoumer.az" style="color:#000000;text-decoration:underline;font-size:14px;font-family:Poppins,Arial,sans-serif;">${copy.supportCta}</a>
+              <div class="tile" style="border:1px solid #ded2b6;border-radius:14px;background:#fff9ec;padding:16px;min-height:148px;">
+                <h3 style="margin:0 0 10px;color:#211a12;font-size:18px;font-family:'Playfair Display',Georgia,serif;">${copy.supportTitle}</h3>
+                <p style="margin:0 0 12px;color:#4d4537;font-size:14px;line-height:1.5;font-family:Poppins,Arial,sans-serif;">${copy.supportBody}</p>
+                <a href="mailto:orders@perfoumer.az" style="color:#1d1a14;text-decoration:underline;font-size:14px;font-family:Poppins,Arial,sans-serif;">${copy.supportCta}</a>
               </div>
             </td>
             <td class="col-right" style="width:50%;vertical-align:top;padding:24px 24px 24px 10px;">
-              <div class="tile" style="border:1px solid #000000;border-radius:14px;background:#ffffff;padding:16px;min-height:148px;">
-                <h3 style="margin:0 0 10px;color:#000000;font-size:18px;font-family:'Playfair Display',Georgia,serif;">${copy.manageTitle}</h3>
-                <p style="margin:0 0 12px;color:#000000;font-size:14px;line-height:1.5;font-family:Poppins,Arial,sans-serif;">${copy.manageBody}</p>
-                <a href="${siteUrl}/account" style="color:#000000;text-decoration:underline;font-size:14px;font-family:Poppins,Arial,sans-serif;">${copy.manageCta}</a>
+              <div class="tile" style="border:1px solid #ded2b6;border-radius:14px;background:#fff9ec;padding:16px;min-height:148px;">
+                <h3 style="margin:0 0 10px;color:#211a12;font-size:18px;font-family:'Playfair Display',Georgia,serif;">${copy.manageTitle}</h3>
+                <p style="margin:0 0 12px;color:#4d4537;font-size:14px;line-height:1.5;font-family:Poppins,Arial,sans-serif;">${copy.manageBody}</p>
+                <a href="${siteUrl}/account" style="color:#1d1a14;text-decoration:underline;font-size:14px;font-family:Poppins,Arial,sans-serif;">${copy.manageCta}</a>
               </div>
             </td>
           </tr>
         </table>
       </div>
 
-      <div class="panel footer" style="background:#ffffff;text-align:center;padding:34px 20px;border:1px solid #000000;border-radius:18px;overflow:hidden;">
-        <p style="margin:0;color:#000000;font-family:Poppins,Arial,sans-serif;font-size:13px;line-height:1.7;">© ${new Date().getFullYear()} Perfoumer<br/>${copy.footerLocation}</p>
-        <div class="footer-links" style="margin-top:12px;font-size:12px;color:#000000;font-family:Poppins,Arial,sans-serif;">
-          <a href="${siteUrl}" style="color:#000000;text-decoration:none;margin:0 8px;">${copy.linkHome}</a> |
-          <a href="${siteUrl}/catalog" style="color:#000000;text-decoration:none;margin:0 8px;">${copy.linkCatalog}</a> |
-          <a href="${siteUrl}/account" style="color:#000000;text-decoration:none;margin:0 8px;">${copy.linkAccount}</a> |
-          <a href="mailto:orders@perfoumer.az" style="color:#000000;text-decoration:none;margin:0 8px;">${copy.linkSupport}</a>
+      <div class="panel footer" style="background:#f6efdf;text-align:center;padding:34px 20px;border:1px solid #d8d0bb;border-radius:18px;overflow:hidden;">
+        <p style="margin:0;color:#3f3729;font-family:Poppins,Arial,sans-serif;font-size:13px;line-height:1.7;">© ${new Date().getFullYear()} Perfoumer<br/>${copy.footerLocation}</p>
+        <div class="footer-links" style="margin-top:12px;font-size:12px;color:#3f3729;font-family:Poppins,Arial,sans-serif;">
+          <a href="${siteUrl}" style="color:#221d15;text-decoration:none;margin:0 8px;">${copy.linkHome}</a> |
+          <a href="${siteUrl}/catalog" style="color:#221d15;text-decoration:none;margin:0 8px;">${copy.linkCatalog}</a> |
+          <a href="${siteUrl}/account" style="color:#221d15;text-decoration:none;margin:0 8px;">${copy.linkAccount}</a> |
+          <a href="mailto:orders@perfoumer.az" style="color:#221d15;text-decoration:none;margin:0 8px;">${copy.linkSupport}</a>
         </div>
       </div>
     </div>

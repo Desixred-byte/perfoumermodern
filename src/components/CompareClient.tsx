@@ -6,6 +6,7 @@ import { ArrowRight, CaretDown, Sparkle, X } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { Locale } from "@/lib/i18n";
+import { localizeNoteLabel } from "@/lib/note-label";
 import type { Note, Perfume } from "@/types/catalog";
 
 type CompareClientProps = {
@@ -151,6 +152,7 @@ const copyByLocale: Record<Locale, Copy> = {
 };
 
 const SLOT_COUNT = 3;
+const ETIRSHAH_BRAND = "etirshah parfum";
 
 const toReadableNote = (value: string) =>
   value
@@ -175,15 +177,51 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
   const [aiRemaining, setAiRemaining] = useState<number | null>(null);
   const shellRef = useRef<HTMLDivElement | null>(null);
 
-  const bySlug = useMemo(() => new Map(perfumes.map((item) => [item.slug, item])), [perfumes]);
+  const pickerPerfumes = useMemo(() => {
+    const byNameAndBrand = new Map<string, Perfume>();
+
+    for (const perfume of perfumes) {
+      const nameKey = perfume.name.trim().toLowerCase();
+      const brandKey = (perfume.brand || "").trim().toLowerCase();
+      const dedupeKey = `${nameKey}::${brandKey}`;
+      const previous = byNameAndBrand.get(dedupeKey);
+
+      if (!previous) {
+        byNameAndBrand.set(dedupeKey, perfume);
+        continue;
+      }
+
+      const nextScore = Number(perfume.inStock) * 4 + Number(perfume.sizes.length > 0) * 2 + perfume.sizes.length;
+      const prevScore = Number(previous.inStock) * 4 + Number(previous.sizes.length > 0) * 2 + previous.sizes.length;
+
+      if (nextScore > prevScore) {
+        byNameAndBrand.set(dedupeKey, perfume);
+      }
+    }
+
+    const deduped = Array.from(byNameAndBrand.values());
+    const namesWithNonEtirshah = new Set(
+      deduped
+        .filter((item) => (item.brand || "").trim().toLowerCase() !== ETIRSHAH_BRAND)
+        .map((item) => item.name.trim().toLowerCase()),
+    );
+
+    return deduped.filter((item) => {
+      const isEtirshah = (item.brand || "").trim().toLowerCase() === ETIRSHAH_BRAND;
+      const nameKey = item.name.trim().toLowerCase();
+      return !isEtirshah || !namesWithNonEtirshah.has(nameKey);
+    });
+  }, [perfumes]);
+
+  const bySlug = useMemo(() => new Map(pickerPerfumes.map((item) => [item.slug, item])), [pickerPerfumes]);
   const noteBySlug = useMemo(() => new Map(notes.map((item) => [item.slug, item])), [notes]);
   const searchablePerfumes = useMemo(
     () =>
-      perfumes.map((item) => ({
+      pickerPerfumes.map((item) => ({
         perfume: item,
         searchText: `${item.name} ${item.brand}`.toLowerCase(),
       })),
-    [perfumes],
+    [pickerPerfumes],
   );
 
   const selectedPerfumes = useMemo(
@@ -368,7 +406,9 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
       <div className="flex flex-wrap gap-2">
         {slugs.map((slug) => {
           const note = noteBySlug.get(slug);
-          const label = note?.name?.trim() || toReadableNote(slug);
+          const label = note
+            ? localizeNoteLabel({ slug: note.slug, name: note.name }, locale)
+            : localizeNoteLabel({ slug, name: toReadableNote(slug) }, locale);
 
           return (
             <span
@@ -506,7 +546,7 @@ export function CompareClient({ perfumes, notes, locale }: CompareClientProps) {
                     </div>
                     {options.map((item) => (
                       <button
-                        key={item.id}
+                        key={`${item.slug}-${item.brand}`}
                         type="button"
                         onClick={() => {
                           setSlot(index, item.slug);

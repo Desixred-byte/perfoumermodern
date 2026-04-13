@@ -84,6 +84,25 @@ create table if not exists public.ai_chat_sessions (
   expires_at timestamptz not null default (timezone('utc', now()) + interval '3 hours')
 );
 
+create table if not exists public.abandoned_cart_recovery (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  source text not null default 'cart' check (source in ('cart', 'checkout')),
+  locale text not null default 'az' check (locale in ('az', 'en', 'ru')),
+  recovery_channel text not null default 'email' check (recovery_channel in ('email', 'whatsapp')),
+  email text,
+  phone text,
+  cart_subtotal numeric(10, 2) not null default 0 check (cart_subtotal >= 0),
+  cart_items_json jsonb not null default '[]'::jsonb,
+  recommendations_json jsonb not null default '[]'::jsonb,
+  incentive_text text not null default '',
+  status text not null default 'queued' check (status in ('queued', 'sent', 'cancelled', 'completed')),
+  scheduled_for timestamptz not null default (timezone('utc', now()) + interval '30 minutes'),
+  sent_at timestamptz,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 alter table public.cart_items
   add column if not exists perfume_slug text;
 
@@ -141,6 +160,9 @@ create index if not exists ai_chat_sessions_user_last_message_idx
 create index if not exists ai_chat_sessions_user_expires_idx
   on public.ai_chat_sessions (user_id, expires_at desc);
 
+create index if not exists abandoned_cart_recovery_user_created_idx
+  on public.abandoned_cart_recovery (user_id, created_at desc);
+
 create or replace function public.set_updated_at()
 returns trigger
 language plpgsql
@@ -169,11 +191,18 @@ before update on public.ai_chat_sessions
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists set_abandoned_cart_recovery_updated_at on public.abandoned_cart_recovery;
+create trigger set_abandoned_cart_recovery_updated_at
+before update on public.abandoned_cart_recovery
+for each row
+execute function public.set_updated_at();
+
 alter table public.comments enable row level security;
 alter table public.wishlists enable row level security;
 alter table public.cart_items enable row level security;
 alter table public.checkout_addresses enable row level security;
 alter table public.ai_chat_sessions enable row level security;
+alter table public.abandoned_cart_recovery enable row level security;
 
 drop policy if exists "Comments are visible to everyone" on public.comments;
 create policy "Comments are visible to everyone"
@@ -317,6 +346,28 @@ create policy "Users can delete own ai chat sessions"
   to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "Users can read own abandoned cart recovery" on public.abandoned_cart_recovery;
+create policy "Users can read own abandoned cart recovery"
+  on public.abandoned_cart_recovery
+  for select
+  to authenticated
+  using (user_id = auth.uid());
+
+drop policy if exists "Users can insert own abandoned cart recovery" on public.abandoned_cart_recovery;
+create policy "Users can insert own abandoned cart recovery"
+  on public.abandoned_cart_recovery
+  for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
+drop policy if exists "Users can update own abandoned cart recovery" on public.abandoned_cart_recovery;
+create policy "Users can update own abandoned cart recovery"
+  on public.abandoned_cart_recovery
+  for update
+  to authenticated
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
 insert into storage.buckets (id, name, public)
 values ('avatars', 'avatars', true)
 on conflict (id) do nothing;
@@ -414,3 +465,92 @@ create policy "Users can update their own order notes"
   to authenticated
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- Live website analytics (sessions + events)
+create table if not exists public.website_live_sessions (
+  session_id text primary key,
+  anonymous_id text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  is_logged_in boolean not null default false,
+  device_type text not null default 'unknown',
+  os text not null default '',
+  browser text not null default '',
+  locale text not null default 'az',
+  path text not null default '/',
+  referrer text not null default '',
+  first_seen timestamptz not null default timezone('utc', now()),
+  last_seen timestamptz not null default timezone('utc', now()),
+  page_views integer not null default 1 check (page_views >= 0),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.website_analytics_events (
+  id bigserial primary key,
+  session_id text not null,
+  anonymous_id text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  is_logged_in boolean not null default false,
+  device_type text not null default 'unknown',
+  os text not null default '',
+  browser text not null default '',
+  locale text not null default 'az',
+  path text not null default '/',
+  referrer text not null default '',
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create index if not exists website_live_sessions_last_seen_idx
+  on public.website_live_sessions (last_seen desc);
+
+create index if not exists website_live_sessions_user_idx
+  on public.website_live_sessions (user_id);
+
+create index if not exists website_live_sessions_anonymous_idx
+  on public.website_live_sessions (anonymous_id);
+
+create index if not exists website_analytics_events_created_idx
+  on public.website_analytics_events (created_at desc);
+
+create index if not exists website_analytics_events_user_idx
+  on public.website_analytics_events (user_id);
+
+create index if not exists website_analytics_events_anonymous_idx
+  on public.website_analytics_events (anonymous_id);
+
+create index if not exists website_analytics_events_path_idx
+  on public.website_analytics_events (path);
+
+drop trigger if exists set_website_live_sessions_updated_at on public.website_live_sessions;
+create trigger set_website_live_sessions_updated_at
+before update on public.website_live_sessions
+for each row
+execute function public.set_updated_at();
+
+alter table public.website_live_sessions enable row level security;
+alter table public.website_analytics_events enable row level security;
+
+drop policy if exists "Analytics sessions are readable" on public.website_live_sessions;
+create policy "Analytics sessions are readable"
+  on public.website_live_sessions
+  for select
+  using (true);
+
+drop policy if exists "Analytics sessions are writable" on public.website_live_sessions;
+create policy "Analytics sessions are writable"
+  on public.website_live_sessions
+  for all
+  using (true)
+  with check (true);
+
+drop policy if exists "Analytics events are readable" on public.website_analytics_events;
+create policy "Analytics events are readable"
+  on public.website_analytics_events
+  for select
+  using (true);
+
+drop policy if exists "Analytics events are insertable" on public.website_analytics_events;
+create policy "Analytics events are insertable"
+  on public.website_analytics_events
+  for insert
+  with check (true);

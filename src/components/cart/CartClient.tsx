@@ -246,6 +246,62 @@ export function CartClient({ perfumes, locale, supabase: supabaseConfig }: CartC
     [items],
   );
 
+  useEffect(() => {
+    if (!session?.access_token || !session?.user?.id) return;
+    if (!session?.user?.email) return;
+    if (!items.length) return;
+
+    const payload = {
+      locale,
+      source: "cart",
+      recoveryChannel: "email",
+      email: session.user.email || "",
+      phone: "",
+      subtotal,
+      items: items.map((item) => ({
+        perfume_slug: item.row.perfume_slug,
+        perfume_name: item.perfume?.name || item.row.perfume_slug,
+        size_ml: item.row.size_ml,
+        quantity: item.quantity,
+        line_total: item.lineTotal,
+      })),
+    };
+
+    const signature = JSON.stringify(payload);
+    const dedupeKey = `perfoumer.abandoned-recovery.${session.user.id}`;
+    if (typeof window !== "undefined") {
+      const prev = window.localStorage.getItem(dedupeKey);
+      if (prev === signature) {
+        return;
+      }
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch("/api/checkout/abandoned-recovery", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(dedupeKey, signature);
+        }
+      } catch {
+        // Ignore transient recovery queue errors in cart UI.
+      }
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [items, locale, session?.access_token, session?.user?.email, session?.user?.id, subtotal]);
+
   const updateQuantity = async (row: CartItemRow, nextQuantity: number) => {
     if (!supabase || !session?.user || busyItemId) return;
 

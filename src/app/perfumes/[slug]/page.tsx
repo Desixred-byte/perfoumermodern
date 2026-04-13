@@ -195,9 +195,9 @@ export default async function PerfumeDetailPage({
 
             <div className="rounded-[1.95rem] bg-white/96 p-6 shadow-[0_20px_54px_rgba(24,24,24,0.05)] ring-1 ring-zinc-200/80 md:p-8">
               <div className="space-y-8">
-                <NoteGroup title={t.detail.topNotes} notes={perfume.notes.top} />
-                <NoteGroup title={t.detail.heartNotes} notes={perfume.notes.heart} />
-                <NoteGroup title={t.detail.baseNotes} notes={perfume.notes.base} />
+                <NoteGroup title={t.detail.topNotes} notes={perfume.notes.top} locale={locale} />
+                <NoteGroup title={t.detail.heartNotes} notes={perfume.notes.heart} locale={locale} />
+                <NoteGroup title={t.detail.baseNotes} notes={perfume.notes.base} locale={locale} />
               </div>
             </div>
 
