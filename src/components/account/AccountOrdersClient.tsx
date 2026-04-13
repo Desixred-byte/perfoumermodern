@@ -145,7 +145,16 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
         });
 
         if (!response.ok) {
-          throw new Error("Failed to fetch orders");
+          let errorMessage = "Failed to fetch orders";
+          try {
+            const errorData = await response.json();
+            if (errorData.error) {
+              errorMessage = `Error (${response.status}): ${errorData.error}`;
+            }
+          } catch {
+            errorMessage = `Error ${response.status}: ${response.statusText}`;
+          }
+          throw new Error(errorMessage);
         }
 
         const data = await response.json();
@@ -231,7 +240,14 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
     return (
       <div className="rounded-[1.5rem] border border-red-200 bg-red-50 p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
         <h1 className="text-[1.35rem] tracking-[-0.02em] text-red-900 sm:text-[1.6rem]">{copy.title}</h1>
-        <p className="mt-2 text-sm text-red-600">{error}</p>
+        <p className="mt-2 text-sm text-red-700 font-medium">Unable to load orders</p>
+        <p className="mt-1 text-sm text-red-600">{error}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="mt-4 inline-flex min-h-9 items-center justify-center rounded-full border border-red-300 bg-white px-4 text-sm font-medium text-red-700 transition hover:bg-red-100"
+        >
+          Try again
+        </button>
       </div>
     );
   }
