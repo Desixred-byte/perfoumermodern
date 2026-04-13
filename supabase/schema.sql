@@ -391,13 +391,17 @@ create index if not exists orders_order_number_idx
 create index if not exists orders_status_idx
   on public.orders (status);
 
-create policy if not exists "Users can view their own orders"
+alter table public.orders enable row level security;
+
+drop policy if exists "Users can view their own orders" on public.orders;
+create policy "Users can view their own orders"
   on public.orders
   for select
   to authenticated
   using (user_id = auth.uid());
 
-create policy if not exists "Users can update their own order notes"
+drop policy if exists "Users can update their own order notes" on public.orders;
+create policy "Users can update their own order notes"
   on public.orders
   for update
   to authenticated

@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json(
@@ -49,24 +50,33 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const supabase = createClient(supabaseUrl, supabaseKey, {
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const authClient = createClient(supabaseUrl, supabaseKey, {
+      global: {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       },
     });
 
     // Get user info
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const { data: { user }, error: userError } = await authClient.auth.getUser(token);
 
     if (userError || !user) {
+      console.error("Orders user lookup failed:", userError);
       return NextResponse.json(
-        { error: "User not found" },
+        { error: "Session expired or invalid. Please sign in again." },
         { status: 401 }
       );
     }
 
+    // Query orders with service-role when available to avoid RLS/policy drift issues.
+    // Token validation above guarantees we only read the authenticated user's rows.
+    const ordersClient = supabaseServiceRoleKey
+      ? createClient(supabaseUrl, supabaseServiceRoleKey)
+      : authClient;
+
     // Fetch orders
-    const { data: orders, error: ordersError } = await supabase
+    const { data: orders, error: ordersError } = await ordersClient
       .from("orders")
       .select("*")
       .eq("user_id", user.id)
@@ -74,8 +84,25 @@ export async function GET(request: NextRequest) {
 
     if (ordersError) {
       console.error("Orders fetch error:", ordersError);
+
+      if (ordersError.code === "42P01") {
+        return NextResponse.json({
+          success: true,
+          orders: [],
+          count: 0,
+          warning: "Orders table is missing in this Supabase project.",
+        });
+      }
+
+      if (ordersError.code === "42501") {
+        return NextResponse.json(
+          { error: "Permission denied for orders. Check Supabase RLS policies." },
+          { status: 500 }
+        );
+      }
+
       return NextResponse.json(
-        { error: "Failed to fetch orders" },
+        { error: `Failed to fetch orders: ${ordersError.message}` },
         { status: 500 }
       );
     }
