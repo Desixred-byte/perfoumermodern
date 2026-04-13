@@ -53,8 +53,15 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
           total: "Cəmi",
           status: "Status",
           payment: "Ödəniş",
+          progress: "Sifariş irəliləyişi",
           tracking: "Təhvil kodu",
           noTracking: "Henüz təhvil kodu yoxdur",
+          stepPlaced: "Qəbul edildi",
+          stepProcessing: "Hazırlanır",
+          stepShipped: "Yola çıxıb",
+          stepDelivered: "Çatdırıldı",
+          cancelledHint: "Bu sifariş ləğv edilib",
+          refundedHint: "Bu sifariş üçün geri ödəniş edilib",
           statusPending: "Gözləmədə",
           statusProcessing: "İşləyir",
           statusCompleted: "Tamamlandı",
@@ -79,8 +86,15 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
             total: "Итого",
             status: "Статус",
             payment: "Платеж",
+            progress: "Прогресс заказа",
             tracking: "Номер отслеживания",
             noTracking: "Номер отслеживания еще недоступен",
+            stepPlaced: "Принят",
+            stepProcessing: "Готовится",
+            stepShipped: "Отправлен",
+            stepDelivered: "Доставлен",
+            cancelledHint: "Этот заказ отменен",
+            refundedHint: "По этому заказу оформлен возврат",
             statusPending: "В ожидании",
             statusProcessing: "Обработка",
             statusCompleted: "Завершено",
@@ -104,8 +118,15 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
             total: "Total",
             status: "Status",
             payment: "Payment",
+            progress: "Order progress",
             tracking: "Tracking",
             noTracking: "Tracking number not available yet",
+            stepPlaced: "Placed",
+            stepProcessing: "Processing",
+            stepShipped: "Shipped",
+            stepDelivered: "Delivered",
+            cancelledHint: "This order was cancelled",
+            refundedHint: "This order was refunded",
             statusPending: "Pending",
             statusProcessing: "Processing",
             statusCompleted: "Completed",
@@ -212,6 +233,22 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
     return colors[status] || "text-zinc-600 bg-zinc-50";
   };
 
+  const getProgressIndex = (status: string) => {
+    switch (status) {
+      case "pending":
+        return 1;
+      case "processing":
+        return 2;
+      case "shipped":
+        return 3;
+      case "delivered":
+      case "completed":
+        return 4;
+      default:
+        return 1;
+    }
+  };
+
   const formatDate = (dateString: string) => {
     try {
       return new Date(dateString).toLocaleDateString(locale === "az" ? "az-AZ" : locale === "ru" ? "ru-RU" : "en-US", {
@@ -280,54 +317,82 @@ export function AccountOrdersClient({ locale, supabase: supabaseConfig }: Accoun
       <h1 className="text-[1.35rem] tracking-[-0.02em] text-zinc-900 sm:text-[1.6rem]">{copy.title}</h1>
 
       {orders.map((order) => (
-        <div key={order.id} className="rounded-[1.5rem] border border-zinc-200 bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.04)] sm:p-6">
-          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
-            <div className="space-y-2">
-              <h3 className="text-lg font-medium text-zinc-900">
-                {copy.orderNumber} {order.order_number}
-              </h3>
-              <p className="text-sm text-zinc-500">{copy.date}: {formatDate(order.created_at)}</p>
-            </div>
-            <div className="flex flex-col gap-2 text-right">
-              <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.status)}`}>
-                {getStatusLabel(order.status)}
+        <div key={order.id} className="overflow-hidden rounded-[1.7rem] border border-zinc-200 bg-white shadow-[0_10px_28px_rgba(18,18,18,0.06)]">
+          <div className="border-b border-zinc-200 bg-gradient-to-r from-zinc-50 to-white px-5 py-4 sm:px-6">
+            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+              <div>
+                <h3 className="text-lg font-semibold tracking-[-0.01em] text-zinc-900">
+                  {copy.orderNumber} {order.order_number}
+                </h3>
+                <p className="mt-1 text-sm text-zinc-500">{copy.date}: {formatDate(order.created_at)}</p>
               </div>
-              <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.payment_status)}`}>
-                {getPaymentLabel(order.payment_status)}
+              <div className="flex flex-wrap gap-2 sm:justify-end">
+                <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.status)}`}>
+                  {getStatusLabel(order.status)}
+                </div>
+                <div className={`inline-flex rounded-full px-3 py-1 text-xs font-medium ${getStatusColor(order.payment_status)}`}>
+                  {copy.payment}: {getPaymentLabel(order.payment_status)}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="mt-4 border-t border-zinc-200 pt-4">
-            <h4 className="mb-3 text-sm font-medium text-zinc-700">{copy.items}</h4>
-            <div className="space-y-2">
+          <div className="space-y-5 px-5 py-5 sm:px-6">
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 p-4">
+              <p className="mb-3 text-xs font-semibold tracking-[0.08em] text-zinc-500 uppercase">{copy.progress}</p>
+              {order.status === "cancelled" ? (
+                <p className="text-sm font-medium text-red-700">{copy.cancelledHint}</p>
+              ) : order.status === "refunded" ? (
+                <p className="text-sm font-medium text-orange-700">{copy.refundedHint}</p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[copy.stepPlaced, copy.stepProcessing, copy.stepShipped, copy.stepDelivered].map((label, index) => {
+                      const active = index + 1 <= getProgressIndex(order.status);
+                      return (
+                        <div key={label} className="flex flex-col items-center gap-2 text-center">
+                          <div
+                            className={`h-2 w-full rounded-full ${active ? "bg-zinc-900" : "bg-zinc-200"}`}
+                            aria-hidden="true"
+                          />
+                          <span className={`text-[11px] leading-4 ${active ? "font-medium text-zinc-900" : "text-zinc-400"}`}>
+                            {label}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div>
+              <h4 className="mb-3 text-sm font-medium text-zinc-700">{copy.items}</h4>
+              <div className="space-y-2">
               {order.items.map((item, idx) => (
-                <div key={idx} className="flex justify-between text-sm text-zinc-600">
-                  <span>
+                <div key={idx} className="flex items-start justify-between gap-3 text-sm text-zinc-600">
+                  <span className="max-w-[68%]">
                     {item.perfume_name} ({item.size_ml}ML) × {item.quantity}
                   </span>
-                  <span>{item.total_price.toFixed(2)} {order.currency}</span>
+                  <span className="font-medium text-zinc-900">{item.total_price.toFixed(2)} {order.currency}</span>
                 </div>
               ))}
             </div>
-          </div>
+            </div>
 
-          <div className="mt-4 border-t border-zinc-200 pt-4">
-            <div className="flex justify-between text-base font-medium text-zinc-900">
-              <span>{copy.total}</span>
-              <span>
-                {order.total_amount.toFixed(2)} {order.currency}
-              </span>
+            <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+              <div className="flex justify-between text-base font-semibold text-zinc-900">
+                <span>{copy.total}</span>
+                <span>
+                  {order.total_amount.toFixed(2)} {order.currency}
+                </span>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 text-sm text-zinc-600">
+              {copy.tracking}: <span className="font-medium text-zinc-900">{order.tracking_number || copy.noTracking}</span>
             </div>
           </div>
-
-          {order.tracking_number && (
-            <div className="mt-4 border-t border-zinc-200 pt-4">
-              <p className="text-sm text-zinc-600">
-                {copy.tracking}: <span className="font-medium text-zinc-900">{order.tracking_number}</span>
-              </p>
-            </div>
-          )}
         </div>
       ))}
     </div>

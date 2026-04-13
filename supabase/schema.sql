@@ -400,6 +400,13 @@ create policy "Users can view their own orders"
   to authenticated
   using (user_id = auth.uid());
 
+drop policy if exists "Users can insert their own orders" on public.orders;
+create policy "Users can insert their own orders"
+  on public.orders
+  for insert
+  to authenticated
+  with check (user_id = auth.uid());
+
 drop policy if exists "Users can update their own order notes" on public.orders;
 create policy "Users can update their own order notes"
   on public.orders

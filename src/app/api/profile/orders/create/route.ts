@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
     const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    if (!supabaseUrl || !supabaseAnonKey || !supabaseServiceRoleKey) {
+    if (!supabaseUrl || !supabaseAnonKey) {
       return NextResponse.json({ error: "Supabase config missing" }, { status: 500 });
     }
 
@@ -69,10 +69,12 @@ export async function POST(request: NextRequest) {
 
     const paymentOrderId = typeof body.payment_order_id === "string" ? body.payment_order_id.trim() : "";
 
-    const serviceClient = createClient(supabaseUrl, supabaseServiceRoleKey);
+    const writeClient = supabaseServiceRoleKey
+      ? createClient(supabaseUrl, supabaseServiceRoleKey)
+      : authClient;
 
     if (paymentOrderId) {
-      const { data: existing } = await serviceClient
+      const { data: existing } = await writeClient
         .from("orders")
         .select("id,order_number")
         .eq("user_id", user.id)
@@ -86,7 +88,7 @@ export async function POST(request: NextRequest) {
 
     let deliveryAddress: Record<string, unknown> | null = null;
     if (typeof body.selected_address_id === "string" && body.selected_address_id.trim()) {
-      const { data: address } = await serviceClient
+      const { data: address } = await writeClient
         .from("checkout_addresses")
         .select("full_name,phone,line1,line2,city,postal_code,country")
         .eq("id", body.selected_address_id)
@@ -109,7 +111,7 @@ export async function POST(request: NextRequest) {
     const paymentStatus = body.payment_status ?? "completed";
     const status = paymentStatus === "completed" ? "processing" : "pending";
 
-    const { data: createdOrder, error: createError } = await serviceClient
+    const { data: createdOrder, error: createError } = await writeClient
       .from("orders")
       .insert([
         {
